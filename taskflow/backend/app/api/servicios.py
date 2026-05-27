@@ -146,6 +146,7 @@ async def listar_servicios(
 async def crear_servicio(
     datos: ServicioCrear,
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -177,16 +178,17 @@ async def crear_servicio(
     # Insertar el nuevo servicio en la tabla
     await db.execute(text("""
         INSERT INTO servicios
-            (id, codigo, nombre, descripcion, servicio_padre_id, activo, fecha_alta, creado_por)
+            (id, codigo, nombre, descripcion, servicio_padre_id, activo, fecha_alta, creado_por, empresa_id)
         VALUES
-            (:id, :codigo, :nombre, :descripcion, :padre_id, TRUE, CURRENT_DATE, :creado_por)
+            (:id, :codigo, :nombre, :descripcion, :padre_id, TRUE, CURRENT_DATE, :creado_por, :empresa_id)
     """), {
         "id": nuevo_id,
         "codigo": datos.codigo.upper(),          # Siempre en mayúsculas
         "nombre": datos.nombre,
         "descripcion": datos.descripcion,
         "padre_id": datos.servicio_padre_id or None,
-        "creado_por": str(usuario_actual.id),    # Auditoría: quién creó
+        "creado_por": str(usuario_actual.id),
+        "empresa_id": empresa_id,
     })
     await db.flush()  # Propaga el INSERT dentro de la transacción activa
 
