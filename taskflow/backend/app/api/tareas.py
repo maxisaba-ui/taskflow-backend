@@ -254,6 +254,7 @@ INSTRUCCION DE APLICACION:
 async def crear_tarea(
     datos: TareaCrear,
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -298,13 +299,13 @@ async def crear_tarea(
             rubro_id, asignado_a_id, cliente_id, servicio_id,
             fecha_planificada, fecha_vencimiento, sla_horas, prioridad, estado,
             creada_por_id, tipo_creacion, comentario_supervisor,
-            es_heredada, activa, creado_en
+            empresa_id, es_heredada, activa, creado_en
         ) VALUES (
             :id, :catalogo_tarea_id, :nombre_personalizado, :descripcion,
             :rubro_id, :asignado_a_id, :cliente_id, :servicio_id,
             :fecha_planificada, :fecha_vencimiento, :sla_horas, :prioridad, 'pendiente',
             :creada_por_id, :tipo_creacion, :comentario_supervisor,
-            FALSE, TRUE, NOW()
+            :empresa_id, FALSE, TRUE, NOW()
         )
     """), {
         "id":                   nuevo_id,
@@ -322,6 +323,7 @@ async def crear_tarea(
         "creada_por_id":        str(usuario_actual.id),
         "tipo_creacion":        tipo_creacion,
         "comentario_supervisor": datos.comentario_supervisor,
+        "empresa_id":            empresa_id,
     })
 
     await db.flush()
