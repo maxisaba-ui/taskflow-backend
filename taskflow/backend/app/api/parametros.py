@@ -23,6 +23,7 @@ from typing import Optional
 from datetime import date
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.api.auth import obtener_usuario_actual, obtener_empresa_id
 from app.models.usuario import Usuario
 
