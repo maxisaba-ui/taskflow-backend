@@ -210,7 +210,8 @@ async def obtener_cliente(
 async def crear_cliente(
     datos: ClienteCrear,
     db: AsyncSession = Depends(get_db),
-    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id)
 ):
     """Crea un nuevo cliente. Valida CUIT y unicidad si se proporcionó."""
     if datos.cuit and datos.cuit.strip():
