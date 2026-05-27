@@ -93,6 +93,6 @@ class TareaComentario(Base):
     tipo       = Column(String(30), default="general")
     comentario = Column(Text, nullable=False)
     creado_en  = Column(DateTime(timezone=True))
-    empresa_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id"))
+    empresa_id = Column(UUID(as_uuid=True))
 
     tarea = relationship("Tarea", back_populates="comentarios")
