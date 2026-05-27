@@ -23,3 +23,4 @@ class Cliente(Base):
     creado_en = Column(DateTime(timezone=True))
     creado_por = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"))
     actualizado_en = Column(DateTime(timezone=True))
+    empresa_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id"))
