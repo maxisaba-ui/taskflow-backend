@@ -64,7 +64,8 @@ export default function GestionEmpresa() {
       const formData = new FormData();
       formData.append("archivo", archivoLogo);
       const token = localStorage.getItem("taskflow_token");
-      const resp = await fetch("/api/v1/parametros/empresa/logo", {
+      const apiUrl = import.meta.env.VITE_API_URL || "/api/v1";
+      const resp = await fetch(`${apiUrl}/parametros/empresa/logo`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,
