@@ -228,7 +228,7 @@ async def crear_cliente(
         datos_dict = datos.dict()
         datos_dict["cuit"] = None
 
-    c = Cliente(**datos_dict, activo=True, fecha_alta=date.today(), creado_por=usuario_actual.id)
+    c = Cliente(**datos_dict, activo=True, fecha_alta=date.today(), creado_por=usuario_actual.id, empresa_id=empresa_id)
     db.add(c)
     await db.flush()
     return {"id": str(c.id), "mensaje": "Cliente creado correctamente"}
