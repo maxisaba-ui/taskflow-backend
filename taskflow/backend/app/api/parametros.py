@@ -598,54 +598,54 @@ async def subir_logo_empresa(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    DESCRIPCION FUNCIONAL:
-      Sube el logo de la empresa activa.
-      Acepta JPG, PNG, SVG, WEBP. Tamaño máximo 2MB.
-      Guarda el archivo en static/logos/ y actualiza logo_url en la BD.
-    DESCRIPCION TECNICA:
-      El archivo se guarda con el nombre empresa_{id}.{ext}
-      La URL se construye como /static/logos/empresa_{id}.{ext}
-      Sobrescribe el logo anterior si existe.
-    """
+    """Sube el logo de la empresa a Supabase Storage."""
     from sqlalchemy import text as sqlt
-    import os, uuid as uuid_mod
+    import httpx
 
-    # Verificar permisos
     perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
     if not any(p in perfiles for p in ["administrador", "dueno"]):
         raise HTTPException(403, "Solo administradores pueden cambiar el logo")
 
-    # Verificar tipo de archivo
     ext = archivo.filename.rsplit(".", 1)[-1].lower() if "." in archivo.filename else ""
     if ext not in ("jpg", "jpeg", "png", "svg", "webp"):
         raise HTTPException(400, "Formato no permitido. Usar JPG, PNG, SVG o WEBP")
 
-    # Verificar tamaño (máximo 2MB)
     contenido = await archivo.read()
     if len(contenido) > 2 * 1024 * 1024:
         raise HTTPException(400, "El archivo es demasiado grande. Máximo 2MB")
 
-    # Obtener empresa activa
-    emp = await db.execute(sqlt(
-        "SELECT id FROM empresas WHERE activa = TRUE LIMIT 1"
-    ))
+    emp = await db.execute(sqlt("SELECT id FROM empresas WHERE activa = TRUE LIMIT 1"))
     empresa = emp.fetchone()
     if not empresa:
         raise HTTPException(404, "No hay empresa activa")
 
-    # Guardar archivo
     nombre_archivo = f"empresa_{empresa.id}.{ext}"
-    ruta_archivo   = os.path.join("static", "logos", nombre_archivo)
-    with open(ruta_archivo, "wb") as f:
-        f.write(contenido)
+    content_type_map = {
+        "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "png": "image/png", "svg": "image/svg+xml", "webp": "image/webp"
+    }
+    content_type = content_type_map.get(ext, "image/png")
 
-    # Actualizar logo_url en la BD
-    logo_url = f"/static/logos/{nombre_archivo}"
-    await db.execute(sqlt("""
-        UPDATE empresas SET logo_url = :url WHERE id = :id
-    """), {"url": logo_url, "id": str(empresa.id)})
+    supabase_url = settings.SUPABASE_URL
+    service_key  = settings.SUPABASE_SERVICE_KEY
+    upload_url   = f"{supabase_url}/storage/v1/object/logos/{nombre_archivo}"
 
-    await db.commit()
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            upload_url, content=contenido,
+            headers={
+                "Authorization": f"Bearer {service_key}",
+                "Content-Type": content_type,
+                "x-upsert": "true",
+            },
+            timeout=30,
+        )
+        if resp.status_code not in (200, 201):
+            raise HTTPException(500, f"Error al subir logo: {resp.text}")
+
+    logo_url = f"{supabase_url}/storage/v1/object/public/logos/{nombre_archivo}"
+    await db.execute(sqlt("UPDATE empresas SET logo_url = :url WHERE id = :id"),
+                     {"url": logo_url, "id": str(empresa.id)})
     await db.commit()
     return {"logo_url": logo_url, "mensaje": "Logo actualizado correctamente"}
+

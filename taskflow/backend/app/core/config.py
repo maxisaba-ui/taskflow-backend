@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
+    SUPABASE_URL:         str = ""
+    SUPABASE_SERVICE_KEY: str = ""
     DATABASE_URL: str = ""
     SECRET_KEY: str = "clave-secreta-default"
     GOOGLE_CLIENT_ID: str = ""
