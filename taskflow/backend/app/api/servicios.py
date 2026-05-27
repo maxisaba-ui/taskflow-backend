@@ -111,11 +111,11 @@ async def listar_servicios(
         LEFT JOIN servicio_tareas st ON s.id = st.servicio_id
             AND st.activo = TRUE                 -- Solo tareas activas en el conteo
         WHERE s.activo = :activo
-        {"AND s.empresa_id = :empresa_id" if empresa_id else ""}
+        AND (:empresa_id IS NULL OR s.empresa_id = :empresa_id)
         GROUP BY s.id, s.codigo, s.nombre, s.descripcion,
                  s.activo, s.servicio_padre_id, sp.nombre
         ORDER BY sp.nombre NULLS FIRST, s.nombre  -- Raíces primero, luego por nombre
-    """), {"activo": activo, **( {"empresa_id": empresa_id} if empresa_id else {} )})
+    """), {"activo": activo, "empresa_id": empresa_id})
 
     rows = result.fetchall()  # Trae todos los resultados a memoria
 
