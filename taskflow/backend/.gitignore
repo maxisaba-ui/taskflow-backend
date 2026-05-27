@@ -1,0 +1,15 @@
+# TaskFlow Pro — Archivos que NO deben subirse a GitHub
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.env.local
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
