@@ -50,7 +50,15 @@ export function AuthProvider({ children }) {
       localStorage.setItem("taskflow_token", data.access_token);
       // Copiar token al clipboard para el widget de escritorio
       try {
-        await navigator.clipboard.writeText(data.access_token);
+        const _ta = document.createElement("textarea");
+        _ta.value = data.access_token;
+        _ta.style.position = "fixed";
+        _ta.style.opacity = "0";
+        document.body.appendChild(_ta);
+        _ta.focus();
+        _ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(_ta);
       } catch(e) {}
       // Notificar al widget de escritorio si está escuchando
       try {
