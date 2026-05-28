@@ -48,6 +48,10 @@ export function AuthProvider({ children }) {
         { empresa_id: empresaId });
       // Reemplazar el token en localStorage
       localStorage.setItem("taskflow_token", data.access_token);
+      // Copiar token al clipboard para el widget de escritorio
+      try {
+        await navigator.clipboard.writeText(data.access_token);
+      } catch(e) {}
       // Notificar al widget de escritorio si está escuchando
       try {
         fetch(`http://localhost:9876/token?t=${data.access_token}`, {
