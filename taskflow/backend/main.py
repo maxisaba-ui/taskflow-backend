@@ -44,6 +44,15 @@ app.include_router(notificaciones.router,     prefix="/api/v1/notificaciones",  
 
 @app.on_event("startup")
 async def startup():
+    # Migración automática: agrega columna meses_activos si no existe
+    from app.core.database import AsyncSessionLocal
+    from sqlalchemy import text as sqlt
+    async with AsyncSessionLocal() as db:
+        await db.execute(sqlt("""
+            ALTER TABLE servicio_tareas
+            ADD COLUMN IF NOT EXISTS meses_activos TEXT DEFAULT NULL
+        """))
+        await db.commit()
     await iniciar_scheduler()
 
 @app.get("/")

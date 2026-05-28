@@ -2,6 +2,7 @@
 API de Tareas — Módulo central del sistema
 Handles: CRUD, play/pausa/fin, herencia, métricas del día
 v1.1.0: fix timezone America/Argentina/Buenos_Aires en inicio_real y fin_real
+v1.2.0: filtra sugerencias por meses_activos en agenda_sugerencias
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1229,6 +1230,7 @@ async def agenda_sugerencias(
             st.duracion_estimada_minutos,
             st.es_obligatoria,
             st.orden,
+            st.meses_activos,
             ct.id              AS catalogo_tarea_id,
             ct.nombre          AS tarea_nombre,
             ct.codigo          AS tarea_codigo,
@@ -1257,6 +1259,12 @@ async def agenda_sugerencias(
         clave = (str(r.cliente_id), str(r.catalogo_tarea_id))
         if clave in ya_asignadas:
             continue   # Ya asignada — no sugerir
+
+        # Filtrar por meses_activos: si está definido, el mes actual debe estar en la lista
+        if r.meses_activos:
+            meses_permitidos = [int(m) for m in r.meses_activos.split(",") if m.strip().isdigit()]
+            if mes not in meses_permitidos:
+                continue   # Este mes no está habilitado para esta tarea
 
         fecha_sugerida = _calcular_fecha_sugerida(
             regla_tipo    = r.regla_tipo,

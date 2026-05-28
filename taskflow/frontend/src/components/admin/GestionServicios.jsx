@@ -1,11 +1,13 @@
 /**
  * =============================================================
  * Archivo: GestionServicios.jsx
+ * Versión: v1.1.0
  * -------------------------------------------------------------
  * DESCRIPCIÓN FUNCIONAL:
  *   Pantalla de administración de servicios del estudio contable.
  *   Permite crear, editar servicios (simples y anidados), agregar
  *   tareas con parametría de calendarización, editar y quitar tareas.
+ *   v1.1.0: agrega selector de meses para recurrencia anual por meses.
  *   Cuando se selecciona un servicio padre, el panel derecho muestra
  *   primero una sección de "Sub-servicios" (hijos directos) con sus
  *   datos resumidos y navegación directa, y luego las tareas propias.
@@ -19,7 +21,8 @@
  *   que el panel derecho para consistencia visual.
  * =============================================================
  */
-import { useState, useEffect, useRef } from "react";
+import { useContext, useState, useEffect, useRef } from "react";
+import { AuthContext } from "../../context/AuthContext.jsx";
 import { api } from "../../api/client.js";
 
 /* ── Constantes de calendarización ─────────────────────────── */
@@ -60,6 +63,12 @@ const CON_N   = ["fecha_fija_mes","dia_habil_n","dias_habiles_despues","dias_hab
 const CON_REF = ["dias_habiles_despues","dias_habiles_antes"];
 /** Referencias que requieren un valor numérico adicional */
 const REF_CON_VAL = ["dia_corrido","dia_habil"];
+
+/** Nombres de meses en español para el selector de recurrencia anual */
+const MESES = [
+  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
+];
 
 /* ── Paleta de colores para rubros ──────────────────────────── */
 const COLORES_RUBRO = {
@@ -205,6 +214,10 @@ function FormTarea({ inicial, catalogo, modoEdicion, onGuardar, onCancelar }) {
     es_obligatoria:            inicial?.es_obligatoria !== undefined ? inicial.es_obligatoria : true,
     orden:                     inicial?.orden                 || 0,
     duracion_estimada_minutos: inicial?.duracion_estimada_minutos || 30,
+    // meses_activos: array de números (1-12); vacío = todos los meses
+    meses_activos: inicial?.meses_activos
+      ? inicial.meses_activos.split(",").map(Number).filter(Boolean)
+      : [],
   });
   const [err, setErr] = useState(""); /* Mensaje de error de validación */
 
@@ -225,6 +238,10 @@ function FormTarea({ inicial, catalogo, modoEdicion, onGuardar, onCancelar }) {
       ref_valor:                 f.ref_valor ? parseInt(f.ref_valor) : null,
       orden:                     parseInt(f.orden) || 0,
       duracion_estimada_minutos: parseInt(f.duracion_estimada_minutos) || 30,
+      // Convertir array a "1,3,6" o null si no se seleccionaron meses
+      meses_activos: f.meses_activos.length > 0
+        ? [...f.meses_activos].sort((a, b) => a - b).join(",")
+        : null,
     });
   }
 
@@ -302,6 +319,51 @@ function FormTarea({ inicial, catalogo, modoEdicion, onGuardar, onCancelar }) {
                 </>
               )}
             </>
+          )}
+        </div>
+      )}
+
+      {/* Selector de meses: solo visible cuando tipo = 'automatica' */}
+      {f.tipo_calendarizacion === "automatica" && (
+        <div style={{ background:"#111827", borderRadius:"6px", padding:"10px", marginBottom:"8px" }}>
+          <label style={{ ...E.label, marginBottom:"6px" }}>
+            Limitar a meses del año (opcional)
+          </label>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"4px" }}>
+            {MESES.map((nombre, i) => {
+              const num = i + 1;
+              const activo = f.meses_activos.includes(num);
+              return (
+                <label key={num} style={{
+                  display:"flex", alignItems:"center", gap:"5px",
+                  cursor:"pointer", fontSize:"12px",
+                  color: activo ? "#6ee7b7" : "#9ca3af",
+                  background: activo ? "#064e3b" : "transparent",
+                  borderRadius:"4px", padding:"3px 6px",
+                  border: `1px solid ${activo ? "#10b981" : "#374151"}`,
+                }}>
+                  <input type="checkbox" checked={activo}
+                    onChange={() => {
+                      const nuevos = activo
+                        ? f.meses_activos.filter(m => m !== num)
+                        : [...f.meses_activos, num];
+                      setF({...f, meses_activos: nuevos});
+                    }}
+                    style={{ accentColor:"#10b981" }} />
+                  {nombre}
+                </label>
+              );
+            })}
+          </div>
+          {f.meses_activos.length === 0 && (
+            <div style={{ fontSize:"11px", color:"#6b7280", marginTop:"6px" }}>
+              Sin selección = se genera todos los meses
+            </div>
+          )}
+          {f.meses_activos.length > 0 && (
+            <div style={{ fontSize:"11px", color:"#10b981", marginTop:"6px" }}>
+              Solo en: {f.meses_activos.sort((a,b)=>a-b).map(m => MESES[m-1]).join(", ")}
+            </div>
           )}
         </div>
       )}
@@ -492,6 +554,11 @@ function TarjetaServicio({ s, seleccionado, servicios, onClick, onEditar }) {
      Conteo de hijos calculado localmente sin endpoint extra.
    ============================================================= */
 export default function GestionServicios() {
+  const { usuario } = useContext(AuthContext);
+  const esOperador = usuario?.perfiles?.includes("operador") &&
+    !usuario?.perfiles?.includes("supervisor") &&
+    !usuario?.perfiles?.includes("administrador") &&
+    !usuario?.perfiles?.includes("dueno");
   const [servicios, setServicios]             = useState([]);
   const [catalogo, setCatalogo]               = useState([]);
   const [seleccionado, setSeleccionado]       = useState(null);
@@ -667,6 +734,10 @@ export default function GestionServicios() {
       d += ` → ${rf?.label || t.ref_tipo}`;
       if (t.ref_valor) d += ` ${t.ref_valor}`;
     }
+    if (t.meses_activos) {
+      const nombres = t.meses_activos.split(",").map(m => MESES[parseInt(m)-1]).join(", ");
+      d += ` · Solo: ${nombres}`;
+    }
     return d;
   }
 
@@ -692,7 +763,7 @@ export default function GestionServicios() {
           setFSvc({ codigo:"", nombre:"", descripcion:"", servicio_padre_id:"" });
           setMsg({ texto:"", tipo:"" });
         }}>
-          {mostrarFormSvc && !svcEditando ? "✕ Cancelar" : "+ Nuevo Servicio"}
+          {!esOperador && (mostrarFormSvc && !svcEditando ? "✕ Cancelar" : "+ Nuevo Servicio")}
         </button>
       </div>
 
@@ -790,7 +861,7 @@ export default function GestionServicios() {
                 {!tareaEditando && (
                   <button style={{ ...E.btn, padding:"6px 12px", fontSize:"12px" }}
                     onClick={() => { setMostrarAddTarea(!mostrarAddTarea); setMsg({ texto:"", tipo:"" }); }}>
-                    {mostrarAddTarea ? "✕ Cancelar" : "+ Agregar tarea"}
+                    {!esOperador && (mostrarAddTarea ? "✕ Cancelar" : "+ Agregar tarea")}
                   </button>
                 )}
               </div>

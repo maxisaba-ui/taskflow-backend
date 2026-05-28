@@ -1,6 +1,7 @@
 """
 =============================================================
 Archivo: servicios.py
+Versión: v1.1.0
 -------------------------------------------------------------
 DESCRIPCIÓN FUNCIONAL:
   API REST para gestión de servicios del estudio contable.
@@ -8,6 +9,7 @@ DESCRIPCIÓN FUNCIONAL:
   Los servicios pueden anidarse (un servicio puede tener servicios hijos).
   Incluye endpoints para consultar sub-servicios de un padre y los
   servicios contratados por un cliente.
+  v1.1.0: agrega campo meses_activos para recurrencia anual por meses.
 
 DESCRIPCIÓN TÉCNICA:
   Router FastAPI con SQLAlchemy async sobre PostgreSQL (psycopg).
@@ -16,6 +18,8 @@ DESCRIPCIÓN TÉCNICA:
   El orden de rutas es deliberado: las rutas con segmentos fijos
   (ej: /servicio-tarea/, /subservicios) se declaran antes que las
   rutas con parámetros dinámicos para evitar colisiones en FastAPI.
+  meses_activos: string "1,3,6" que indica en qué meses del año aplica
+  la tarea automática. NULL = todos los meses.
 =============================================================
 """
 
@@ -71,6 +75,7 @@ class TareaServicioCrear(BaseModel):
     es_obligatoria: bool = True                        # Si la tarea es obligatoria en el servicio
     orden: int = 0                                     # Número de orden dentro del servicio
     duracion_estimada_minutos: int = 30               # Duración estimada de ejecución en minutos
+    meses_activos: Optional[str] = None               # "1,3,6" → solo genera en esos meses; NULL = todos
 
 
 # =============================================================================
@@ -359,6 +364,7 @@ async def tareas_del_servicio(
             st.ref_tipo,                        -- Tipo de fecha de referencia
             st.ref_valor,                       -- Valor numérico de la referencia
             st.duracion_estimada_minutos,       -- Duración estimada en minutos
+            st.meses_activos,                   -- "1,3,6" si solo aplica ciertos meses; NULL=todos
             ct.id   AS catalogo_tarea_id,       -- UUID de la tarea en el catálogo
             ct.codigo AS tarea_codigo,          -- Código de la tarea (ej: T001)
             ct.nombre AS tarea_nombre,          -- Nombre de la tarea
@@ -385,6 +391,7 @@ async def tareas_del_servicio(
             "ref_tipo": r.ref_tipo,
             "ref_valor": r.ref_valor,
             "duracion_estimada_minutos": r.duracion_estimada_minutos,
+            "meses_activos": r.meses_activos,
             "catalogo_tarea_id": str(r.catalogo_tarea_id),
             "tarea_codigo": r.tarea_codigo,
             "tarea_nombre": r.tarea_nombre,
@@ -445,11 +452,11 @@ async def agregar_tarea_servicio(
         INSERT INTO servicio_tareas
             (id, servicio_id, catalogo_tarea_id, tipo_calendarizacion,
              regla_tipo, regla_valor_n, ref_tipo, ref_valor,
-             es_obligatoria, orden, duracion_estimada_minutos, activo)
+             es_obligatoria, orden, duracion_estimada_minutos, meses_activos, activo)
         VALUES
             (:id, :sid, :tarea_id, :tipo_cal,
              :regla_tipo, :regla_n, :ref_tipo, :ref_valor,
-             :obligatoria, :orden, :duracion, TRUE)
+             :obligatoria, :orden, :duracion, :meses_activos, TRUE)
     """), {
         "id": nuevo_id,
         "sid": servicio_id,
@@ -462,6 +469,7 @@ async def agregar_tarea_servicio(
         "obligatoria": datos.es_obligatoria,
         "orden": datos.orden,
         "duracion": datos.duracion_estimada_minutos,
+        "meses_activos": datos.meses_activos,
     })
     await db.flush()  # Propaga el INSERT dentro de la transacción activa
 
@@ -508,18 +516,20 @@ async def editar_tarea_servicio(
             ref_valor                 = :ref_valor,
             es_obligatoria            = :obligatoria,
             orden                     = :orden,
-            duracion_estimada_minutos = :duracion
+            duracion_estimada_minutos = :duracion,
+            meses_activos             = :meses_activos
         WHERE id = :id
     """), {
-        "tipo_cal":    datos.tipo_calendarizacion,
-        "regla_tipo":  datos.regla_tipo,
-        "regla_n":     datos.regla_valor_n,
-        "ref_tipo":    datos.ref_tipo,
-        "ref_valor":   datos.ref_valor,
-        "obligatoria": datos.es_obligatoria,
-        "orden":       datos.orden,
-        "duracion":    datos.duracion_estimada_minutos,
-        "id":          st_id,
+        "tipo_cal":      datos.tipo_calendarizacion,
+        "regla_tipo":    datos.regla_tipo,
+        "regla_n":       datos.regla_valor_n,
+        "ref_tipo":      datos.ref_tipo,
+        "ref_valor":     datos.ref_valor,
+        "obligatoria":   datos.es_obligatoria,
+        "orden":         datos.orden,
+        "duracion":      datos.duracion_estimada_minutos,
+        "meses_activos": datos.meses_activos,
+        "id":            st_id,
     })
     await db.flush()  # Propaga el UPDATE dentro de la transacción activa
 
