@@ -40,7 +40,7 @@ const MENU = [
   { path:"/clientes",       icono:"👥", label:"Clientes",        requierePerfil: null },
   { path:"/reportes",       icono:"📊", label:"Reportes",        requierePerfil: null },
   { path:"/seguimiento",    icono:"🔍", label:"Seguimiento",     requierePerfil: null },
-  { path:"/agenda",         icono:"📅", label:"Agenda",          requierePerfil: ["supervisor","dueno","administrador"] },
+  { path:"/agenda",         icono:"📅", label:"Agenda",          requierePerfil: ["supervisor","dueno","administrador","operador"] },
   { path: "/seguimiento-complejo", icono: "🔀", label: "Tareas complejas",        requierePerfil: null },
   { path:"/administracion", icono:"⚙️", label:"Administración",  requierePerfil: ["administrador","dueno"] },
 ]
@@ -248,6 +248,28 @@ export default function Layout({ children }) {
             width:"100%", fontSize:"13px",
           }}>
             Cerrar sesión
+          </button>
+          <button onClick={() => {
+            const token = localStorage.getItem("taskflow_token");
+            if (token) {
+              const ta = document.createElement("textarea");
+              ta.value = token;
+              ta.style.position = "fixed";
+              ta.style.opacity = "0";
+              document.body.appendChild(ta);
+              ta.focus();
+              ta.select();
+              document.execCommand("copy");
+              document.body.removeChild(ta);
+              alert("✅ Token copiado. Volvé al widget y hacé clic en 'Ya me logueé'");
+            }
+          }} style={{
+            background:"#1e3a5f", color:"#93c5fd",
+            border:"1px solid #2563eb", borderRadius:"8px",
+            padding:"8px 12px", cursor:"pointer",
+            width:"100%", fontSize:"12px", marginTop:"6px"
+          }}>
+            📋 Conectar Widget
           </button>
         </div>
       </div>
