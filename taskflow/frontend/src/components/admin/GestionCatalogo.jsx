@@ -1,7 +1,7 @@
 /**
  * =============================================================
- * Archivo: GestionCatalogo_compleja.jsx
- * Versión: v1.0.0
+ * Archivo: GestionCatalogo.jsx
+ * Versión: v1.0.1
  * -------------------------------------------------------------
  * DESCRIPCION FUNCIONAL:
  *   Extensión de GestionCatalogo: cuando una tarea está marcada
@@ -15,7 +15,8 @@
 /* ---- INSTRUCCION: reemplazar src/components/admin/GestionCatalogo.jsx
         con este archivo ---- */
 
-import { useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
+import { AuthContext } from "../../context/AuthContext.jsx";
 import { api } from "../../api/client.js";
 
 const E = {
@@ -40,7 +41,10 @@ function FormTareaCatalogo({ inicial, rubros, onGuardar, onCancelar, titulo }) {
     duracion_estimada_minutos: inicial?.duracion_estimada_minutos || "",
     requiere_cliente:          inicial?.requiere_cliente !== undefined ? inicial.requiere_cliente : true,
     es_compleja:               inicial?.es_compleja               || false,
-    sla_horas_default:         inicial?.sla_horas_default || "",
+    // prioridad_default: campo del catálogo para herencia al crear tareas
+    prioridad_default:         inicial?.prioridad_default         || "media",
+    // sla_horas_default: se convierte a null si vacío para evitar 422
+    sla_horas_default:         inicial?.sla_horas_default         || "",
   });
   const [err, setErr] = useState("");
 
@@ -52,7 +56,9 @@ function FormTareaCatalogo({ inicial, rubros, onGuardar, onCancelar, titulo }) {
     onGuardar({
       ...f,
       codigo: f.codigo.trim().toUpperCase(),
+      // Convertir strings vacíos a null para que Pydantic no rechace con 422
       duracion_estimada_minutos: f.duracion_estimada_minutos ? parseInt(f.duracion_estimada_minutos) : null,
+      sla_horas_default:         f.sla_horas_default         ? parseInt(f.sla_horas_default)         : null,
     });
   }
 
@@ -99,7 +105,7 @@ function FormTareaCatalogo({ inicial, rubros, onGuardar, onCancelar, titulo }) {
           value={f.descripcion}
           onChange={e => setF({...f, descripcion: e.target.value})} />
       </div>
-      <div style={{ display:"flex", gap:"20px", marginBottom:"14px" }}>
+      <div style={{ display:"flex", gap:"20px", marginBottom:"14px", flexWrap:"wrap" }}>
         <label style={{ display:"flex", alignItems:"center", gap:"8px",
           color:"#9ca3af", fontSize:"12px", cursor:"pointer" }}>
           <input type="checkbox" checked={f.requiere_cliente}
@@ -112,6 +118,20 @@ function FormTareaCatalogo({ inicial, rubros, onGuardar, onCancelar, titulo }) {
             onChange={e => setF({...f, es_compleja: e.target.checked})} />
           🔀 Tarea compleja (con etapas)
         </label>
+        {/* Prioridad default: se hereda al asignar desde sugerencias */}
+        <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+          <label style={{ color:"#9ca3af", fontSize:"12px", whiteSpace:"nowrap" }}>
+            🎯 Prioridad default:
+          </label>
+          <select style={{ ...E.select, width:"110px" }}
+            value={f.prioridad_default}
+            onChange={e => setF({...f, prioridad_default: e.target.value})}>
+            <option value="urgente">🔴 Urgente</option>
+            <option value="alta">🟠 Alta</option>
+            <option value="media">🟡 Media</option>
+            <option value="baja">🟢 Baja</option>
+          </select>
+        </div>
         <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
           <label style={{ color:"#9ca3af", fontSize:"12px", whiteSpace:"nowrap" }}>
             ⏰ SLA default (hs hábiles):
@@ -383,6 +403,11 @@ function PanelEtapasCompleja({ catalogoTareaId, tituloTarea, usuarios }) {
    COMPONENTE PRINCIPAL: GestionCatalogo
    ============================================================= */
 export default function GestionCatalogo() {
+  const { usuario } = useContext(AuthContext);
+  const esOperador = usuario?.perfiles?.includes("operador") &&
+    !usuario?.perfiles?.includes("supervisor") &&
+    !usuario?.perfiles?.includes("administrador") &&
+    !usuario?.perfiles?.includes("dueno");
   const [tareas, setTareas]               = useState([]);
   const [rubros, setRubros]               = useState([]);
   const [usuarios, setUsuarios]           = useState([]);

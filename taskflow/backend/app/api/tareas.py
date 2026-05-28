@@ -1,6 +1,7 @@
 """
 API de Tareas — Módulo central del sistema
 Handles: CRUD, play/pausa/fin, herencia, métricas del día
+v1.1.0: fix timezone America/Argentina/Buenos_Aires en inicio_real y fin_real
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,8 @@ from app.services.auditoria import registrar_auditoria
 import calendar as cal_module   # Para calcular dias del mes
 
 router = APIRouter()
-TZ = timezone.utc  # Siempre UTC — Supabase almacena en UTC
+# Zona horaria Argentina — los timestamps inicio_real/fin_real se guardan en hora local
+TZ = pytz.timezone('America/Argentina/Buenos_Aires')
 
 
 # ============================================================
@@ -381,7 +383,7 @@ async def tareas_para_widget(
     filtro_empresa_sql    = "AND t.empresa_id = :empresa_id" if empresa_id else ""
     filtro_empresa_params = {"empresa_id": empresa_id} if empresa_id else {}
 
-    # Tareas simples
+    # Tareas simples — incluye JOIN con etapas para detectar tareas de validación supervisor
     r1 = await db.execute(sqlt("""
         SELECT t.id, t.estado, t.prioridad, t.fecha_planificada,
                t.inicio_real, t.fin_real, t.tiempo_trabajado_minutos,
@@ -390,11 +392,16 @@ async def tareas_para_widget(
                COALESCE(ct.nombre, t.nombre_personalizado, 'Sin nombre') AS tarea_nombre,
                COALESCE(ct.codigo, '') AS tarea_codigo,
                c.razon_social AS cliente_nombre,
-               s.nombre       AS servicio_nombre
+               s.nombre       AS servicio_nombre,
+               -- Etapa vinculada si esta tarea es una validación de supervisor
+               te_val.id AS etapa_id_validacion
         FROM tareas t
         LEFT JOIN catalogo_tareas ct ON t.catalogo_tarea_id = ct.id
         LEFT JOIN clientes c         ON t.cliente_id        = c.id
         LEFT JOIN servicios s        ON t.servicio_id       = s.id
+        -- Busca si esta tarea es la tarea de validación de alguna etapa compleja
+        LEFT JOIN tarea_compleja_etapas te_val ON te_val.tarea_validacion_id = t.id
+                                              AND te_val.activo = TRUE
         WHERE t.activa = TRUE AND t.fecha_planificada = :fecha
           AND t.asignado_a_id = :uid
           AND (t.es_tarea_compleja = FALSE OR t.es_tarea_compleja IS NULL)
@@ -418,6 +425,8 @@ async def tareas_para_widget(
         "comentario_operador":r.comentario_operador,
         "asignado_a_id":str(r.asignado_a_id),
         "cliente_nombre":r.cliente_nombre,"servicio_nombre":r.servicio_nombre,
+        # ID de la etapa a validar (solo para tareas de validación supervisor)
+        "etapa_id_validacion": str(r.etapa_id_validacion) if r.etapa_id_validacion else None,
     } for r in r1.fetchall()]
 
     # Etapas de tareas complejas
@@ -478,22 +487,32 @@ async def tareas_para_widget(
 @router.get("/para-jornada")
 async def tareas_para_jornada(
     fecha:          Optional[date] = Query(default=None),
+    usuario_id:     Optional[str]  = Query(default=None,
+        description="ID de usuario a consultar (solo supervisores pueden ver otros)"),
     usuario_actual: Usuario        = Depends(obtener_usuario_actual),
     db: AsyncSession               = Depends(get_db)
 ):
-    empresa_id = None
     """
     DESCRIPCION FUNCIONAL:
-      Endpoint para Mi Jornada en el widget Windows.
-      Igual que para-widget pero incluye TODAS las etapas
-      (incluyendo completadas y bloqueadas con actividad).
+      Endpoint para Mi Jornada en browser y widget Windows.
+      Incluye TODAS las etapas (completadas con actividad).
       Agrega nombre del validador para etapas en validacion_pendiente.
+      v1.1.0: acepta usuario_id para que supervisores vean la jornada
+      de un operador específico o la propia.
     """
     from sqlalchemy import text as sqlt
 
     if fecha is None:
         fecha = date.today()
-    uid = str(usuario_actual.id)
+
+    # Verificar permisos si se pide la jornada de otro usuario
+    if usuario_id and str(usuario_id) != str(usuario_actual.id):
+        perfiles = await _obtener_perfiles(usuario_actual.id, db)
+        es_sup = "supervisor" in perfiles or "dueno" in perfiles or "administrador" in perfiles
+        if not es_sup:
+            raise HTTPException(403, "Solo supervisores pueden ver la jornada de otro usuario")
+
+    uid = str(usuario_id) if usuario_id else str(usuario_actual.id)
 
     # Tareas simples — incluye completadas
     r1 = await db.execute(sqlt("""

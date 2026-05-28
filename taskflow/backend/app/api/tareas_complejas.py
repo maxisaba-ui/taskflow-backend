@@ -1,7 +1,7 @@
 """
 =============================================================
 Archivo: tareas_complejas.py
-Versión: v1.0.1
+Versión: v1.0.2
 -------------------------------------------------------------
 DESCRIPCION FUNCIONAL:
   Endpoints REST para el módulo de tareas complejas con etapas.
@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 import uuid as uuid_mod
+import pytz
 
 from app.core.database import get_db
 from app.api.auth import obtener_usuario_actual
@@ -40,7 +41,8 @@ from app.api.tareas import _obtener_perfiles
 
 router = APIRouter()
 
-TZ = timezone.utc  # Siempre UTC — Supabase almacena en UTC
+# Zona horaria Argentina — timestamps inicio_real/fin_real en hora local
+TZ = pytz.timezone('America/Argentina/Buenos_Aires')
 
 
 # =============================================================================
@@ -664,12 +666,13 @@ async def _avanzar_o_completar(ejec_id: str, orden_completado: int, db: AsyncSes
         """), {"ejec_id": ejec_id})).fetchone()
 
         if conteo and conteo.total == conteo.completadas:
-            # Todas completadas → cerrar ejecución y tarea global
+            # Todas completadas → cerrar ejecución y tarea global con hora Argentina
+            ahora_ar = datetime.now(TZ)
             await db.execute(sqlt("""
                 UPDATE tarea_compleja_ejecucion
-                SET estado_general = 'completada', completada_en = NOW()
+                SET estado_general = 'completada', completada_en = :ahora
                 WHERE id = :ejec_id
-            """), {"ejec_id": ejec_id})
+            """), {"ejec_id": ejec_id, "ahora": ahora_ar})
 
             t_row = (await db.execute(sqlt(
                 "SELECT tarea_id FROM tarea_compleja_ejecucion WHERE id = :ejec_id"
@@ -677,9 +680,9 @@ async def _avanzar_o_completar(ejec_id: str, orden_completado: int, db: AsyncSes
 
             if t_row:
                 await db.execute(sqlt("""
-                    UPDATE tareas SET estado = 'completada', fin_real = NOW()
+                    UPDATE tareas SET estado = 'completada', fin_real = :ahora
                     WHERE id = :tid
-                """), {"tid": str(t_row.tarea_id)})
+                """), {"tid": str(t_row.tarea_id), "ahora": ahora_ar})
 
 
 # =============================================================================
