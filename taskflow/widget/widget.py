@@ -1096,6 +1096,21 @@ class VentanaPrincipal(QMainWindow):
         """)
         self.layout_principal.addWidget(self.btn_refresh)
 
+        # Botón conectar: pega el token desde el portapapeles y guarda sesión
+        self.btn_conectar = QPushButton("🔑 Ya me logueé — Pegar Token")
+        self.btn_conectar.setFixedHeight(36)
+        self.btn_conectar.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        self.btn_conectar.setStyleSheet("""
+            QPushButton {
+                background-color: #065F46; color: #6EE7B7;
+                border: 1px solid #10B981; border-radius: 6px; padding: 4px 10px;
+            }
+            QPushButton:hover { background-color: #047857; }
+        """)
+        self.btn_conectar.clicked.connect(self._conectar_desde_clipboard)
+        self.layout_principal.addWidget(self.btn_conectar)
+        self.btn_conectar.hide()  # Se muestra solo cuando no hay sesión
+
     def _configurar_tray(self):
         self.tray = QSystemTrayIcon(self)
         pixmap = QPixmap(32, 32)
@@ -1129,9 +1144,55 @@ class VentanaPrincipal(QMainWindow):
             nombre     = settings.value("nombre", "Usuario")
             self.lbl_usuario.setText(f"👤 {nombre}")
             self.hora_fin_jornada = settings.value("hora_fin", "18:00")
+            self.btn_conectar.hide()
             self.cargar_tareas()
         else:
-            self.lbl_resumen.setText("⚠️ No hay sesión. Iniciá sesión desde la web.")
+            self.lbl_resumen.setText(
+                "1. Abrí la web y logueate\n"
+                "2. Hacé clic en '📋 Conectar Widget' en el menú lateral\n"
+                "3. Volvé aquí y tocá el botón verde"
+            )
+            self.btn_conectar.show()
+
+    def _conectar_desde_clipboard(self):
+        """Lee el token JWT del portapapeles, lo valida y guarda la sesión."""
+        from PyQt6.QtGui import QGuiApplication
+        clipboard = QGuiApplication.clipboard().text().strip()
+
+        if not clipboard:
+            QMessageBox.warning(self, "Sin token",
+                "El portapapeles está vacío.\n"
+                "Hacé clic en '📋 Conectar Widget' en la web primero.")
+            return
+
+        # Validar el token consultando /auth/me
+        self.lbl_resumen.setText("Verificando token...")
+        try:
+            import requests as req
+            resp = req.get(
+                f"{API_BASE_URL}/auth/me",
+                headers={"Authorization": f"Bearer {clipboard}"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                datos = resp.json()
+                nombre = f"{datos.get('nombre','')} {datos.get('apellido','')}".strip()
+                # Guardar en QSettings para próximas sesiones
+                settings = QSettings("TaskFlowPro", "Widget")
+                settings.setValue("token",  clipboard)
+                settings.setValue("nombre", nombre)
+                self.token = clipboard
+                self.lbl_usuario.setText(f"👤 {nombre}")
+                self.btn_conectar.hide()
+                self.lbl_resumen.setText("✅ Conectado. Cargando tareas...")
+                self.cargar_tareas()
+            else:
+                QMessageBox.critical(self, "Token inválido",
+                    f"El token no es válido o expiró ({resp.status_code}).\n"
+                    "Volvé a loguearte en la web y copiá el token de nuevo.")
+                self.lbl_resumen.setText("⚠️ Token inválido. Reintentá.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error de conexión", str(e))
 
     def cargar_tareas(self):
         """Carga tareas del día usando /tareas/para-widget (incluye etapas complejas)."""
