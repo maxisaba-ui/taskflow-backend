@@ -1,7 +1,7 @@
 /**
  * =============================================================
  * Archivo: Layout.jsx
- * Versión: v1.1.0
+ * Versión: v1.2.0
  * -------------------------------------------------------------
  * DESCRIPCION FUNCIONAL:
  *   Estructura base de la aplicacion. Renderiza el menu lateral
@@ -35,14 +35,15 @@ import { AuthContext } from "../context/AuthContext.jsx"
  *   Si es un array, se muestra solo si el usuario tiene alguno
  *   de esos perfiles.
  */
+// Orden del menú: Dashboard → Agenda → Tareas complejas → Seguimiento → Reportes → Clientes → Administración
 const MENU = [
-  { path:"/",               icono:"🏠", label:"Dashboard",      requierePerfil: null },
-  { path:"/clientes",       icono:"👥", label:"Clientes",        requierePerfil: null },
-  { path:"/reportes",       icono:"📊", label:"Reportes",        requierePerfil: null },
-  { path:"/seguimiento",    icono:"🔍", label:"Seguimiento",     requierePerfil: null },
-  { path:"/agenda",         icono:"📅", label:"Agenda",          requierePerfil: ["supervisor","dueno","administrador","operador"] },
-  { path: "/seguimiento-complejo", icono: "🔀", label: "Tareas complejas",        requierePerfil: null },
-  { path:"/administracion", icono:"⚙️", label:"Administración",  requierePerfil: ["administrador","dueno"] },
+  { path:"/",                     icono:"🏠", label:"Dashboard",        requierePerfil: null },
+  { path:"/agenda",               icono:"📅", label:"Agenda",            requierePerfil: ["supervisor","dueno","administrador","operador"] },
+  { path:"/seguimiento-complejo", icono:"🔀", label:"Tareas complejas",  requierePerfil: null },
+  { path:"/seguimiento",          icono:"🔍", label:"Seguimiento",       requierePerfil: null },
+  { path:"/reportes",             icono:"📊", label:"Reportes",          requierePerfil: null },
+  { path:"/clientes",             icono:"👥", label:"Clientes",          requierePerfil: null },
+  { path:"/administracion",       icono:"⚙️", label:"Administración",    requierePerfil: ["administrador","dueno"] },
 ]
 
 export default function Layout({ children }) {
