@@ -48,6 +48,12 @@ export function AuthProvider({ children }) {
         { empresa_id: empresaId });
       // Reemplazar el token en localStorage
       localStorage.setItem("taskflow_token", data.access_token);
+      // Notificar al widget de escritorio si está escuchando
+      try {
+        fetch(`http://localhost:9876/token?t=${data.access_token}`, {
+          mode: "no-cors"
+        }).catch(() => {});
+      } catch(e) {}
       // Actualizar el usuario con los datos de la nueva empresa
       setUsuario(prev => ({
         ...prev,
