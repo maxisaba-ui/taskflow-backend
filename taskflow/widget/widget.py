@@ -19,8 +19,19 @@ import json
 import csv
 import io
 import os
+import socket
 import requests
 from datetime import datetime, date
+
+# ── Control de instancia única ────────────────────────────────
+# Abre un socket en un puerto local exclusivo. Si ya hay una instancia
+# corriendo el bind falla y esta nueva instancia se cierra silenciosamente.
+_instancia_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+_instancia_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+try:
+    _instancia_socket.bind(("127.0.0.1", 47291))
+except OSError:
+    sys.exit(0)  # Ya hay una instancia — salir sin mostrar error
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QListWidget, QListWidgetItem, QDialog,
@@ -1216,6 +1227,7 @@ class VentanaPrincipal(QMainWindow):
                 it.widget().deleteLater()
 
         if not self.tareas:
+            self.lbl_resumen.setText("📋 No hay tareas pendientes hoy")
             lbl = QLabel("🎉 No hay tareas pendientes hoy")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet(f"color: {COLORES['texto_sec']}; padding: 20px;")
