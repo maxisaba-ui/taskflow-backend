@@ -1081,9 +1081,9 @@ class VentanaPrincipal(QMainWindow):
 
     def _configurar_ventana(self):
         self.setWindowTitle(APP_NAME)
-        self.setFixedWidth(380)
-        self.setMinimumHeight(500)
-        self.setMaximumHeight(800)
+        self.setMinimumWidth(360)
+        self.setMinimumHeight(480)
+        self.resize(400, 640)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
         self.setStyleSheet(f"background-color: {COLORES['fondo']}; color: {COLORES['texto']};")
 
@@ -1339,7 +1339,7 @@ class VentanaPrincipal(QMainWindow):
         self.layout_tareas.addStretch()
 
     def _mostrar_error(self, msg: str):
-        # Si el error es 401 o 403, la sesión expiró — limpiar y pedir reconexión
+        # Sesión expirada — limpiar y pedir reconexión
         if "401" in msg or "403" in msg or "expirado" in msg.lower() or "invalido" in msg.lower():
             QSettings("TaskFlowPro", "Widget").remove("token")
             self.token = None
@@ -1349,6 +1349,10 @@ class VentanaPrincipal(QMainWindow):
                 "y hacé clic en '📋 Conectar Widget'."
             )
             self.btn_conectar.show()
+            return
+        # Errores de negocio (4xx) — mostrar en diálogo para que se lea completo
+        if any(c in msg for c in ("400", "404", "422", "500")):
+            QMessageBox.warning(self, "Error", msg)
             return
         self.lbl_resumen.setText(f"❌ {msg}")
         self.tray.showMessage("TaskFlow Pro", msg, QSystemTrayIcon.MessageIcon.Warning, 3000)
