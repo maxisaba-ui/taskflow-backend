@@ -660,8 +660,9 @@ class VistaJornada(QDialog):
         return w
 
     def _cargar(self):
-        """Llama al endpoint /tareas/para-jornada."""
-        w = ApiWorker("GET", "/tareas/para-jornada", token=self.token)
+        """Llama al endpoint /tareas/para-jornada con fecha local de la máquina."""
+        fecha_local = date.today().isoformat()  # fecha local Windows, no UTC del servidor
+        w = ApiWorker("GET", f"/tareas/para-jornada?fecha={fecha_local}", token=self.token)
         w.resultado.connect(self._mostrar)
         w.error.connect(lambda msg: self._mostrar_error(msg))
         self.workers.append(w)
@@ -1206,12 +1207,12 @@ class VentanaPrincipal(QMainWindow):
             QMessageBox.critical(self, "Error de conexión", str(e))
 
     def cargar_tareas(self):
-        """Carga tareas del día usando /tareas/para-widget (incluye etapas complejas)."""
+        """Carga tareas del día usando /tareas/para-widget con fecha local de la máquina."""
         if not self.token:
             return
         self.lbl_resumen.setText("Actualizando...")
-        # para-widget devuelve tarea_simple + etapa_compleja con nombres de campo correctos
-        worker = ApiWorker("GET", "/tareas/para-widget", token=self.token)
+        fecha_local = date.today().isoformat()  # fecha local Windows, no UTC del servidor
+        worker = ApiWorker("GET", f"/tareas/para-widget?fecha={fecha_local}", token=self.token)
         worker.resultado.connect(self._mostrar_tareas)
         worker.error.connect(self._mostrar_error)
         self.workers.append(worker)
