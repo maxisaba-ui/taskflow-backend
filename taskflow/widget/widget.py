@@ -67,6 +67,14 @@ COLORES = {
     "amarillo":           "#F59E0B",
 }
 
+# Color del borde superior según prioridad
+PRIO_COLOR = {
+    "urgente": "#EF4444",
+    "alta":    "#F97316",
+    "media":   "#EAB308",
+    "baja":    "#22C55E",
+}
+
 
 # ============================================================
 # HILO PARA LLAMADAS A LA API (no bloquea la UI)
@@ -364,8 +372,9 @@ class TareaCard(QFrame):
     signal_pausar       = pyqtSignal(str)
     signal_reanudar     = pyqtSignal(str)
     signal_finalizar    = pyqtSignal(str)
-    signal_iniciar_etapa   = pyqtSignal(str)   # para etapas complejas
+    signal_iniciar_etapa   = pyqtSignal(str)
     signal_pausar_etapa    = pyqtSignal(str)
+    signal_reanudar_etapa  = pyqtSignal(str)
     signal_finalizar_etapa = pyqtSignal(str)
     signal_validar      = pyqtSignal(str, str)  # (tarea_id, etapa_id)
 
@@ -377,78 +386,134 @@ class TareaCard(QFrame):
         self._construir_ui()
 
     def _construir_ui(self):
-        tipo    = self.item.get("tipo", "tarea_simple")
-        estado  = self.item.get("estado", "pendiente")
-        nombre  = self.item.get("tarea_nombre", "Sin nombre")  # campo correcto del API
-        cliente = self.item.get("cliente_nombre") or self.item.get("servicio_nombre") or "—"
+        tipo      = self.item.get("tipo", "tarea_simple")
+        estado    = self.item.get("estado", "pendiente")
+        nombre    = self.item.get("tarea_nombre", "Sin nombre")
+        cliente   = self.item.get("cliente_nombre") or self.item.get("servicio_nombre") or "—"
+        prioridad = self.item.get("prioridad", "media")
 
-        # Color del borde según estado
-        color_borde = COLORES.get(estado, COLORES["pendiente"])
+        color_estado    = COLORES.get(estado, COLORES["pendiente"])
+        color_prioridad = PRIO_COLOR.get(prioridad, "#EAB308")
 
-        # Fondo especial para tareas de validación supervisor
         es_validacion = (
             nombre.startswith("✅ Validar:") and
             self.item.get("etapa_id_validacion") is not None
         )
-        fondo_card = COLORES["fondo_validacion"] if es_validacion else COLORES["fondo_card"]
+        if es_validacion:
+            fondo_card = COLORES["fondo_validacion"]
+        elif tipo == "etapa_compleja":
+            fondo_card = "#1A1533"
+        else:
+            fondo_card = COLORES["fondo_card"]
 
+        # Borde superior = color de prioridad; sin borde izquierdo
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {fondo_card};
                 border-radius: 10px;
-                border-left: 4px solid {color_borde};
+                border-top: 4px solid {color_prioridad};
                 margin: 4px 2px;
             }}
         """)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(5)
+        layout.setSpacing(4)
 
-        # Badge de tipo para etapas complejas
+        # Header especial para etapas de tarea compleja
         if tipo == "etapa_compleja":
             etapa_ord = self.item.get("etapa_orden", "?")
             total_et  = self.item.get("total_etapas", "?")
             etapa_nom = self.item.get("etapa_nombre", "")
-            lbl_badge = QLabel(f"🔀 Etapa {etapa_ord}/{total_et}  ·  {etapa_nom}")
-            lbl_badge.setFont(QFont("Segoe UI", 9))
-            lbl_badge.setStyleSheet("color: #C4B5FD; border: none; font-style: italic;")
-            layout.addWidget(lbl_badge)
 
-        # Nombre de la tarea
-        lbl_nombre = QLabel(nombre)
-        lbl_nombre.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        lbl_nombre.setStyleSheet(f"color: {COLORES['texto']}; border: none;")
-        lbl_nombre.setWordWrap(True)
-        layout.addWidget(lbl_nombre)
+            # Bloque violeta que identifica visualmente la tarea compleja
+            header_frame = QFrame()
+            header_frame.setStyleSheet("""
+                QFrame {
+                    background: #2D1B69;
+                    border-radius: 6px;
+                    border: 1px solid #7C3AED;
+                }
+            """)
+            lay_h = QVBoxLayout(header_frame)
+            lay_h.setContentsMargins(8, 5, 8, 5)
+            lay_h.setSpacing(2)
 
-        # Info secundaria: cliente/servicio + heredada
-        heredada_txt = "  🔁 Heredada" if self.item.get("es_heredada") else ""
+            lbl_tipo_badge = QLabel("🔀  TAREA COMPLEJA")
+            lbl_tipo_badge.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+            lbl_tipo_badge.setStyleSheet("color: #A78BFA; border: none;")
+            lay_h.addWidget(lbl_tipo_badge)
+
+            lbl_nombre_complejo = QLabel(nombre)
+            lbl_nombre_complejo.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            lbl_nombre_complejo.setStyleSheet("color: #EDE9FE; border: none;")
+            lbl_nombre_complejo.setWordWrap(True)
+            lay_h.addWidget(lbl_nombre_complejo)
+
+            layout.addWidget(header_frame)
+
+            # Paso actual — prominente
+            lbl_paso = QLabel(f"   ↳  Paso {etapa_ord} de {total_et}:  {etapa_nom}")
+            lbl_paso.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            lbl_paso.setStyleSheet("color: #C4B5FD; border: none;")
+            lbl_paso.setWordWrap(True)
+            layout.addWidget(lbl_paso)
+
+        else:
+            lbl_nombre = QLabel(nombre)
+            lbl_nombre.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+            lbl_nombre.setStyleSheet(f"color: {COLORES['texto']}; border: none;")
+            lbl_nombre.setWordWrap(True)
+            layout.addWidget(lbl_nombre)
+
+        # Fila meta: cliente · prioridad · estado
+        row_meta = QHBoxLayout()
+        heredada_txt = "  🔁" if self.item.get("es_heredada") else ""
         lbl_info = QLabel(f"📁 {cliente}{heredada_txt}")
         lbl_info.setFont(QFont("Segoe UI", 10))
         lbl_info.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
-        layout.addWidget(lbl_info)
+        row_meta.addWidget(lbl_info)
+        row_meta.addStretch()
 
-        # Tiempo trabajado acumulado
+        lbl_prio = QLabel(f"● {prioridad.upper()}")
+        lbl_prio.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        lbl_prio.setStyleSheet(f"color: {color_prioridad}; border: none;")
+        row_meta.addWidget(lbl_prio)
+
+        lbl_est = QLabel(f"  {estado.replace('_', ' ').upper()}")
+        lbl_est.setFont(QFont("Segoe UI", 8))
+        lbl_est.setStyleSheet(f"color: {color_estado}; border: none;")
+        row_meta.addWidget(lbl_est)
+        layout.addLayout(row_meta)
+
+        # Tiempo trabajado
         mins = self.item.get("tiempo_trabajado_minutos") or 0
         if mins > 0:
-            hs = mins // 60
-            ms = mins % 60
+            hs = mins // 60; ms = mins % 60
             lbl_t = QLabel(f"⏱ {hs}h {ms:02d}m trabajados")
             lbl_t.setFont(QFont("Segoe UI", 10))
-            lbl_t.setStyleSheet(f"color: {color_borde}; border: none;")
+            lbl_t.setStyleSheet(f"color: {color_estado}; border: none;")
             layout.addWidget(lbl_t)
 
         # Comentario del supervisor
         com_sup = self.item.get("comentario_supervisor") or ""
         if com_sup:
-            lbl_sup = QLabel(f"💬 {com_sup}")
+            lbl_sup = QLabel(f"👤 Supervisor: {com_sup}")
             lbl_sup.setFont(QFont("Segoe UI", 9))
-            lbl_sup.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; font-style: italic;")
+            lbl_sup.setStyleSheet("color: #93C5FD; border: none; font-style: italic;")
             lbl_sup.setWordWrap(True)
             layout.addWidget(lbl_sup)
 
-        # Aviso de corrección pendiente (etapas rechazadas)
+        # Comentario del operador
+        com_op = self.item.get("comentario_operador") or ""
+        if com_op:
+            lbl_op = QLabel(f"💬 {com_op}")
+            lbl_op.setFont(QFont("Segoe UI", 9))
+            lbl_op.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; font-style: italic;")
+            lbl_op.setWordWrap(True)
+            layout.addWidget(lbl_op)
+
+        # Aviso de corrección pendiente
         if self.item.get("requiere_correccion"):
             com_val = self.item.get("comentario_validacion") or ""
             lbl_rech = QLabel(f"⚠️ Corregir: {com_val}")
@@ -457,19 +522,17 @@ class TareaCard(QFrame):
             lbl_rech.setWordWrap(True)
             layout.addWidget(lbl_rech)
 
-        # ── Botones de acción según tipo y estado ──
+        # Botones de acción
         row_btns = QHBoxLayout()
         row_btns.setSpacing(6)
 
         if es_validacion:
-            # Tarea de validación supervisor: Aceptar / Rechazar
             etapa_id_val = self.item.get("etapa_id_validacion", "")
             btn_ok = self._crear_boton("✅ Aceptar", COLORES["verde"])
             btn_ok.clicked.connect(
                 lambda _, eid=etapa_id_val: self.signal_validar.emit(self.item_id, eid)
             )
             row_btns.addWidget(btn_ok)
-
             btn_rech = self._crear_boton("❌ Rechazar", COLORES["rojo"])
             btn_rech.clicked.connect(
                 lambda _, eid=etapa_id_val: self.signal_validar.emit("rechazar:" + self.item_id, eid)
@@ -477,30 +540,32 @@ class TareaCard(QFrame):
             row_btns.addWidget(btn_rech)
 
         elif tipo == "etapa_compleja":
-            # Etapa de tarea compleja: usa endpoints /etapa/{id}/iniciar, etc.
             etapa_id = self.item_id
             if estado == "pendiente":
-                btn = self._crear_boton("▶ Iniciar etapa", COLORES["en_curso"])
+                btn = self._crear_boton("▶ Iniciar paso", COLORES["en_curso"])
                 btn.clicked.connect(lambda _, eid=etapa_id: self.signal_iniciar_etapa.emit(eid))
                 row_btns.addWidget(btn)
             elif estado == "en_curso":
                 btn_p = self._crear_boton("⏸ Pausar", COLORES["pausada"])
+                btn_f = self._crear_boton("⏹ Finalizar paso", COLORES["completada"])
                 btn_p.clicked.connect(lambda _, eid=etapa_id: self.signal_pausar_etapa.emit(eid))
-                btn_f = self._crear_boton("⏹ Finalizar", COLORES["completada"])
                 btn_f.clicked.connect(lambda _, eid=etapa_id: self.signal_finalizar_etapa.emit(eid))
                 row_btns.addWidget(btn_p)
                 row_btns.addWidget(btn_f)
+            elif estado == "pausada":
+                btn_r = self._crear_boton("▶ Reanudar paso", COLORES["en_curso"])
+                btn_r.clicked.connect(lambda _, eid=etapa_id: self.signal_reanudar_etapa.emit(eid))
+                row_btns.addWidget(btn_r)
             elif estado == "validacion_pendiente":
                 lbl_val = QLabel("⏳ Esperando validación del supervisor")
                 lbl_val.setStyleSheet(f"color: {COLORES['validacion_pendiente']}; border: none; font-size: 11px;")
                 row_btns.addWidget(lbl_val)
             elif estado == "completada":
-                lbl_ok = QLabel("✅ Etapa completada")
+                lbl_ok = QLabel("✅ Paso completado")
                 lbl_ok.setStyleSheet(f"color: {COLORES['completada']}; border: none; font-weight: bold;")
                 row_btns.addWidget(lbl_ok)
 
         else:
-            # Tarea simple normal
             tid = self.item_id
             if estado == "pendiente":
                 btn = self._crear_boton("▶ Iniciar", COLORES["en_curso"])
@@ -514,12 +579,10 @@ class TareaCard(QFrame):
                 row_btns.addWidget(btn_p)
                 row_btns.addWidget(btn_f)
             elif estado == "pausada":
-                btn_r = self._crear_boton("▶ Reanudar",  COLORES["en_curso"])
-                btn_f = self._crear_boton("⏹ Finalizar", COLORES["completada"])
+                # Solo Reanudar — no se puede finalizar desde estado pausada
+                btn_r = self._crear_boton("▶ Reanudar", COLORES["en_curso"])
                 btn_r.clicked.connect(lambda _, t=tid: self.signal_reanudar.emit(t))
-                btn_f.clicked.connect(lambda _, t=tid: self.signal_finalizar.emit(t))
                 row_btns.addWidget(btn_r)
-                row_btns.addWidget(btn_f)
             elif estado == "completada":
                 lbl_ok = QLabel("✅ Completada")
                 lbl_ok.setStyleSheet(f"color: {COLORES['completada']}; border: none; font-weight: bold;")
@@ -747,63 +810,85 @@ class VistaJornada(QDialog):
         self.layout_items.addStretch()
 
     def _crear_card_jornada(self, item: dict) -> QFrame:
-        """Crea una tarjeta de jornada para una tarea simple."""
-        estado   = item.get("estado", "pendiente")
-        nombre   = item.get("tarea_nombre", "Sin nombre")
-        cliente  = item.get("cliente_nombre") or item.get("servicio_nombre") or "—"
-        inicio   = self._fmt_hora(item.get("inicio_real"))
-        fin      = self._fmt_hora(item.get("fin_real"))
-        mins     = item.get("tiempo_trabajado_minutos") or 0
-        color_b  = COLORES.get(estado, COLORES["pendiente"])
+        """Tarjeta de jornada: borde superior=prioridad, muestra comentarios."""
+        estado    = item.get("estado", "pendiente")
+        nombre    = item.get("tarea_nombre", "Sin nombre")
+        cliente   = item.get("cliente_nombre") or item.get("servicio_nombre") or "—"
+        prioridad = item.get("prioridad", "media")
+        inicio    = self._fmt_hora(item.get("inicio_real"))
+        fin       = self._fmt_hora(item.get("fin_real"))
+        mins      = item.get("tiempo_trabajado_minutos") or 0
+        color_est = COLORES.get(estado, COLORES["pendiente"])
+        color_pri = PRIO_COLOR.get(prioridad, "#EAB308")
 
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame {{
-                background: {COLORES['fondo_card']};
+                background: {COLORES["fondo_card"]};
                 border-radius: 8px;
-                border-left: 3px solid {color_b};
+                border-top: 3px solid {color_pri};
                 margin: 2px 0;
             }}
         """)
-        lay = QHBoxLayout(card)
+        lay = QVBoxLayout(card)
         lay.setContentsMargins(10, 8, 10, 8)
-        lay.setSpacing(8)
+        lay.setSpacing(3)
 
-        # Bloque hora
+        # Fila superior: hora inicio/fin + nombre
+        row_top = QHBoxLayout()
+        row_top.setSpacing(10)
+
         lbl_hora = QLabel(f"{inicio}\n{fin or '—'}")
         lbl_hora.setFont(QFont("Segoe UI", 9))
-        lbl_hora.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; min-width: 52px;")
+        lbl_hora.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; min-width: 46px;")
         lbl_hora.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay.addWidget(lbl_hora)
+        row_top.addWidget(lbl_hora)
 
-        # Separador vertical
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setStyleSheet(f"color: {color_b};")
-        lay.addWidget(sep)
-
-        # Info tarea
-        col_info = QVBoxLayout()
-        col_info.setSpacing(2)
         lbl_n = QLabel(nombre)
         lbl_n.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         lbl_n.setStyleSheet(f"color: {COLORES['texto']}; border: none;")
         lbl_n.setWordWrap(True)
-        col_info.addWidget(lbl_n)
+        row_top.addWidget(lbl_n, 1)
 
+        lay.addLayout(row_top)
+
+        # Fila meta: cliente · tiempo · prioridad · estado
+        row_meta = QHBoxLayout()
         hs = mins // 60; ms = mins % 60
         lbl_det = QLabel(f"📁 {cliente}   ⏱ {hs}h {ms:02d}m")
         lbl_det.setFont(QFont("Segoe UI", 9))
         lbl_det.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
-        col_info.addWidget(lbl_det)
-        lay.addLayout(col_info)
+        row_meta.addWidget(lbl_det)
+        row_meta.addStretch()
 
-        # Badge estado
-        lbl_est = QLabel(estado.replace("_", " ").capitalize())
-        lbl_est.setFont(QFont("Segoe UI", 9))
-        lbl_est.setStyleSheet(f"color: {color_b}; border: none; font-weight: bold;")
-        lay.addStretch()
-        lay.addWidget(lbl_est)
+        lbl_prio = QLabel(f"● {prioridad.upper()}")
+        lbl_prio.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        lbl_prio.setStyleSheet(f"color: {color_pri}; border: none;")
+        row_meta.addWidget(lbl_prio)
+
+        lbl_est = QLabel(f"  {estado.replace('_', ' ').upper()}")
+        lbl_est.setFont(QFont("Segoe UI", 8))
+        lbl_est.setStyleSheet(f"color: {color_est}; border: none;")
+        row_meta.addWidget(lbl_est)
+        lay.addLayout(row_meta)
+
+        # Comentario del supervisor
+        com_sup = item.get("comentario_supervisor") or ""
+        if com_sup:
+            lbl_sup = QLabel(f"👤 Supervisor: {com_sup}")
+            lbl_sup.setFont(QFont("Segoe UI", 9))
+            lbl_sup.setStyleSheet("color: #93C5FD; border: none; font-style: italic;")
+            lbl_sup.setWordWrap(True)
+            lay.addWidget(lbl_sup)
+
+        # Comentario del operador
+        com_op = item.get("comentario_operador") or ""
+        if com_op:
+            lbl_op = QLabel(f"💬 {com_op}")
+            lbl_op.setFont(QFont("Segoe UI", 9))
+            lbl_op.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; font-style: italic;")
+            lbl_op.setWordWrap(True)
+            lay.addWidget(lbl_op)
 
         return card
 
@@ -1246,6 +1331,7 @@ class VentanaPrincipal(QMainWindow):
                 card.signal_finalizar.connect(self.finalizar_tarea)
                 card.signal_iniciar_etapa.connect(self.iniciar_etapa)
                 card.signal_pausar_etapa.connect(self.pausar_etapa)
+                card.signal_reanudar_etapa.connect(self.reanudar_etapa)
                 card.signal_finalizar_etapa.connect(self.finalizar_etapa)
                 card.signal_validar.connect(self.validar_etapa)
                 self.layout_tareas.insertWidget(self.layout_tareas.count() - 1, card)
@@ -1316,6 +1402,14 @@ class VentanaPrincipal(QMainWindow):
             w.error.connect(self._mostrar_error)
             self.workers.append(w)
             w.start()
+
+    def reanudar_etapa(self, etapa_id: str):
+        w = ApiWorker("POST", f"/tareas-complejas/etapa/{etapa_id}/reanudar",
+                      datos={}, token=self.token)
+        w.resultado.connect(lambda _: self.cargar_tareas())
+        w.error.connect(self._mostrar_error)
+        self.workers.append(w)
+        w.start()
 
     def finalizar_etapa(self, etapa_id: str):
         w = ApiWorker("POST", f"/tareas-complejas/etapa/{etapa_id}/finalizar",
