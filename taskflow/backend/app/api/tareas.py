@@ -613,6 +613,117 @@ async def tareas_para_jornada(
     # Ordenar todo por inicio_real
     items.sort(key=lambda x: x.get("inicio_real") or "9999")
     return items
+@router.get("/historial")
+async def historial_tareas(
+    fecha_desde: Optional[date] = Query(default=None),
+    fecha_hasta: Optional[date] = Query(default=None),
+    usuario_id:  Optional[str]  = Query(default=None),
+    cliente_id:  Optional[str]  = Query(default=None),
+    estado:      Optional[str]  = Query(default=None),
+    usuario_actual: Usuario     = Depends(obtener_usuario_actual),
+    db: AsyncSession             = Depends(get_db)
+):
+    """
+    DESCRIPCION FUNCIONAL:
+      Retorna tareas de un rango de fechas con filtros opcionales.
+      Operadores solo ven sus propias tareas.
+      Supervisores pueden ver cualquier operador o todos.
+    DESCRIPCION TECNICA:
+      SQL directo con JOINs para nombres enriquecidos.
+      Limita a 500 resultados para evitar sobrecarga.
+      Ordenado por fecha_planificada DESC.
+    """
+    from sqlalchemy import text as sqlt
+    from datetime import date as dt
+
+    hoy = dt.today()
+    if fecha_desde is None:
+        fecha_desde = hoy.replace(day=1)
+    if fecha_hasta is None:
+        fecha_hasta = hoy
+
+    perfiles      = await _obtener_perfiles(usuario_actual.id, db)
+    es_supervisor = "supervisor" in perfiles or "dueno" in perfiles or "administrador" in perfiles
+
+    filtros = ["t.activa = TRUE",
+               "t.fecha_planificada BETWEEN :fi AND :ff"]
+    params  = {"fi": fecha_desde, "ff": fecha_hasta}
+
+    if not es_supervisor:
+        filtros.append("t.asignado_a_id = :uid")
+        params["uid"] = str(usuario_actual.id)
+    elif usuario_id:
+        filtros.append("t.asignado_a_id = :uid")
+        params["uid"] = usuario_id
+
+    if cliente_id:
+        filtros.append("t.cliente_id = :cid")
+        params["cid"] = cliente_id
+
+    if estado:
+        filtros.append("t.estado = :estado")
+        params["estado"] = estado
+
+    where = " AND ".join(filtros)
+
+    result = await db.execute(sqlt(f"""
+        SELECT
+            t.id,
+            t.fecha_planificada,
+            t.estado,
+            t.prioridad,
+            t.tiempo_trabajado_minutos,
+            t.es_heredada,
+            t.tipo_creacion,
+            t.comentario_supervisor,
+            t.comentario_operador,
+            t.inicio_real,
+            t.fin_real,
+            t.asignado_a_id,
+            t.cliente_id,
+            t.servicio_id,
+            COALESCE(ct.nombre, t.nombre_personalizado, 'Sin nombre') AS tarea_nombre,
+            COALESCE(ct.codigo, '')                                   AS tarea_codigo,
+            u.nombre  || ' ' || u.apellido  AS operador_nombre,
+            c.razon_social                  AS cliente_nombre,
+            s.nombre                        AS servicio_nombre
+        FROM tareas t
+        JOIN  usuarios u      ON t.asignado_a_id      = u.id
+        LEFT JOIN catalogo_tareas ct ON t.catalogo_tarea_id = ct.id
+        LEFT JOIN clientes    c  ON t.cliente_id          = c.id
+        LEFT JOIN servicios   s  ON t.servicio_id         = s.id
+        WHERE {where}
+        ORDER BY t.fecha_planificada DESC, t.creado_en DESC
+        LIMIT 500
+    """), params)
+
+    return [
+        {
+            "id":                       str(r.id),
+            "tarea_nombre":             r.tarea_nombre,
+            "tarea_codigo":             r.tarea_codigo,
+            "estado":                   r.estado,
+            "prioridad":                r.prioridad,
+            "fecha_planificada":        r.fecha_planificada.isoformat() if r.fecha_planificada else None,
+            "tiempo_trabajado_minutos": r.tiempo_trabajado_minutos,
+            "es_heredada":              r.es_heredada,
+            "tipo_creacion":            r.tipo_creacion,
+            "comentario_supervisor":    r.comentario_supervisor,
+            "comentario_operador":      r.comentario_operador,
+            "inicio_real":              r.inicio_real.isoformat() if r.inicio_real else None,
+            "fin_real":                 r.fin_real.isoformat()    if r.fin_real    else None,
+            "asignado_a_id":            str(r.asignado_a_id),
+            "operador_nombre":          r.operador_nombre,
+            "cliente_id":               str(r.cliente_id)    if r.cliente_id    else None,
+            "cliente_nombre":           r.cliente_nombre,
+            "servicio_id":              str(r.servicio_id)   if r.servicio_id   else None,
+            "servicio_nombre":          r.servicio_nombre,
+        }
+        for r in result.fetchall()
+    ]
+
+
+
 @router.get("/{tarea_id}")
 async def obtener_tarea(
     tarea_id: UUID4,
@@ -1424,128 +1535,6 @@ def _calcular_fecha_referencia(
 
     return None
 
-"""
-=============================================================
-INSTRUCCION: agregar en tareas.py el endpoint de historial.
-Versión: v1.0.0
--------------------------------------------------------------
-Localizar en tareas.py antes de la sección "# HELPERS":
-  # ============================================================
-  # HELPERS (funciones auxiliares)
-  # ============================================================
-
-Agregar ANTES de esa línea el siguiente endpoint:
-=============================================================
-"""
-
-@router.get("/historial")
-async def historial_tareas(
-    fecha_desde: Optional[date] = Query(default=None),
-    fecha_hasta: Optional[date] = Query(default=None),
-    usuario_id:  Optional[str]  = Query(default=None),
-    cliente_id:  Optional[str]  = Query(default=None),
-    estado:      Optional[str]  = Query(default=None),
-    usuario_actual: Usuario     = Depends(obtener_usuario_actual),
-    db: AsyncSession             = Depends(get_db)
-):
-    """
-    DESCRIPCION FUNCIONAL:
-      Retorna tareas de un rango de fechas con filtros opcionales.
-      Operadores solo ven sus propias tareas.
-      Supervisores pueden ver cualquier operador o todos.
-    DESCRIPCION TECNICA:
-      SQL directo con JOINs para nombres enriquecidos.
-      Limita a 500 resultados para evitar sobrecarga.
-      Ordenado por fecha_planificada DESC.
-    """
-    from sqlalchemy import text as sqlt
-    from datetime import date as dt
-
-    hoy = dt.today()
-    if fecha_desde is None:
-        fecha_desde = hoy.replace(day=1)
-    if fecha_hasta is None:
-        fecha_hasta = hoy
-
-    perfiles      = await _obtener_perfiles(usuario_actual.id, db)
-    es_supervisor = "supervisor" in perfiles or "dueno" in perfiles or "administrador" in perfiles
-
-    filtros = ["t.activa = TRUE",
-               "t.fecha_planificada BETWEEN :fi AND :ff"]
-    params  = {"fi": fecha_desde, "ff": fecha_hasta}
-
-    if not es_supervisor:
-        filtros.append("t.asignado_a_id = :uid")
-        params["uid"] = str(usuario_actual.id)
-    elif usuario_id:
-        filtros.append("t.asignado_a_id = :uid")
-        params["uid"] = usuario_id
-
-    if cliente_id:
-        filtros.append("t.cliente_id = :cid")
-        params["cid"] = cliente_id
-
-    if estado:
-        filtros.append("t.estado = :estado")
-        params["estado"] = estado
-
-    where = " AND ".join(filtros)
-
-    result = await db.execute(sqlt(f"""
-        SELECT
-            t.id,
-            t.fecha_planificada,
-            t.estado,
-            t.prioridad,
-            t.tiempo_trabajado_minutos,
-            t.es_heredada,
-            t.tipo_creacion,
-            t.comentario_supervisor,
-            t.comentario_operador,
-            t.inicio_real,
-            t.fin_real,
-            t.asignado_a_id,
-            t.cliente_id,
-            t.servicio_id,
-            COALESCE(ct.nombre, t.nombre_personalizado, 'Sin nombre') AS tarea_nombre,
-            COALESCE(ct.codigo, '')                                   AS tarea_codigo,
-            u.nombre  || ' ' || u.apellido  AS operador_nombre,
-            c.razon_social                  AS cliente_nombre,
-            s.nombre                        AS servicio_nombre
-        FROM tareas t
-        JOIN  usuarios u      ON t.asignado_a_id      = u.id
-        LEFT JOIN catalogo_tareas ct ON t.catalogo_tarea_id = ct.id
-        LEFT JOIN clientes    c  ON t.cliente_id          = c.id
-        LEFT JOIN servicios   s  ON t.servicio_id         = s.id
-        WHERE {where}
-        ORDER BY t.fecha_planificada DESC, t.creado_en DESC
-        LIMIT 500
-    """), params)
-
-    return [
-        {
-            "id":                       str(r.id),
-            "tarea_nombre":             r.tarea_nombre,
-            "tarea_codigo":             r.tarea_codigo,
-            "estado":                   r.estado,
-            "prioridad":                r.prioridad,
-            "fecha_planificada":        r.fecha_planificada.isoformat() if r.fecha_planificada else None,
-            "tiempo_trabajado_minutos": r.tiempo_trabajado_minutos,
-            "es_heredada":              r.es_heredada,
-            "tipo_creacion":            r.tipo_creacion,
-            "comentario_supervisor":    r.comentario_supervisor,
-            "comentario_operador":      r.comentario_operador,
-            "inicio_real":              r.inicio_real.isoformat() if r.inicio_real else None,
-            "fin_real":                 r.fin_real.isoformat()    if r.fin_real    else None,
-            "asignado_a_id":            str(r.asignado_a_id),
-            "operador_nombre":          r.operador_nombre,
-            "cliente_id":               str(r.cliente_id)    if r.cliente_id    else None,
-            "cliente_nombre":           r.cliente_nombre,
-            "servicio_id":              str(r.servicio_id)   if r.servicio_id   else None,
-            "servicio_nombre":          r.servicio_nombre,
-        }
-        for r in result.fetchall()
-    ]
 
 
 class CambiarPrioridadRequest(BaseModel):
