@@ -779,6 +779,7 @@ async def iniciar_tarea(
 
     ahora = datetime.now(TZ)
 
+    estado_anterior = tarea.estado
     if tarea.estado == "pendiente":
         # Primera vez: registrar inicio_real
         await db.execute(sqlt("""
@@ -793,6 +794,11 @@ async def iniciar_tarea(
             WHERE id = :id
         """), {"id": str(tarea_id)})
 
+    await registrar_auditoria(
+        db, "tareas", str(tarea_id), "UPDATE",
+        campo="estado", valor_anterior=estado_anterior, valor_nuevo="en_curso",
+        usuario_id=str(usuario_actual.id)
+    )
     return {"mensaje": "Tarea iniciada", "inicio": ahora.isoformat()}
 
 
@@ -836,6 +842,11 @@ async def pausar_tarea(
         UPDATE tareas SET estado = 'pausada' WHERE id = :id
     """), {"id": str(tarea_id)})
 
+    await registrar_auditoria(
+        db, "tareas", str(tarea_id), "UPDATE",
+        campo="estado", valor_anterior="en_curso", valor_nuevo="pausada",
+        usuario_id=str(usuario_actual.id)
+    )
     return {"mensaje": "Tarea pausada"}
 
 
@@ -874,6 +885,11 @@ async def reanudar_tarea(
         UPDATE tareas SET estado = 'en_curso' WHERE id = :id
     """), {"id": str(tarea_id)})
 
+    await registrar_auditoria(
+        db, "tareas", str(tarea_id), "UPDATE",
+        campo="estado", valor_anterior="pausada", valor_nuevo="en_curso",
+        usuario_id=str(usuario_actual.id)
+    )
     return {"mensaje": "Tarea reanudada"}
 
 
@@ -960,7 +976,12 @@ async def finalizar_tarea(
         "comentario": datos.comentario_operador,
         "id":         str(tarea_id),
     })
- 
+
+    await registrar_auditoria(
+        db, "tareas", str(tarea_id), "UPDATE",
+        campo="estado", valor_anterior="en_curso", valor_nuevo="completada",
+        usuario_id=str(usuario_actual.id)
+    )
     return {
         "mensaje":                  "Tarea completada",
         "fin":                      ahora.isoformat(),
