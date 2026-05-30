@@ -297,22 +297,23 @@ function CardGrupoComplejo({ grupo }) {
 // ── Componente Mi Jornada ──────────────────────────────────
 
 function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
-  const [items, setItems]    = useState([]);
-  const [cargando, setCarg]  = useState(true);
-  const [uidVer, setUidVer]  = useState(usuario?.id || "");
-  const [operadores, setOps] = useState([]);
+  const [items, setItems]        = useState([]);
+  const [cargando, setCarg]      = useState(true);
+  const [uidVer, setUidVer]      = useState(usuario?.id || "");
+  const [operadores, setOps]     = useState([]);
+  const [fechaJornada, setFechaJ] = useState(fecha);
 
   useEffect(() => {
     if (esSupervisor || esAdmin)
       api.get("/usuarios/").then(u => setOps(u || [])).catch(() => {});
   }, [esSupervisor, esAdmin]);
 
-  useEffect(() => { cargar(); }, [fecha, uidVer]);
+  useEffect(() => { cargar(); }, [fechaJornada, uidVer]);
 
   async function cargar() {
     setCarg(true);
     try {
-      let url = `/tareas/para-jornada?fecha=${fecha}`;
+      let url = `/tareas/para-jornada?fecha=${fechaJornada}`;
       if (uidVer && uidVer !== usuario?.id) url += `&usuario_id=${uidVer}`;
       const data = await api.get(url);
       setItems(Array.isArray(data) ? data : []);
@@ -327,18 +328,26 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
 
   return (
     <div style={{ color:"white" }}>
-      {(esSupervisor || esAdmin) && (
-        <div style={{ ...E.card, marginBottom:"16px", display:"flex",
-          alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
-          <label style={{ color:"#9ca3af", fontSize:"13px" }}>Ver jornada de:</label>
-          <select style={E.select} value={uidVer} onChange={e => setUidVer(e.target.value)}>
-            <option value={usuario?.id}>Mi jornada</option>
-            {operadores.filter(u => u.id !== usuario?.id).map(u => (
-              <option key={u.id} value={u.id}>{u.nombre} {u.apellido}</option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Selector de fecha */}
+      <div style={{ ...E.card, marginBottom:"12px", display:"flex",
+        alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
+        <label style={{ color:"#9ca3af", fontSize:"13px" }}>📅 Día:</label>
+        <input type="date" style={E.input} value={fechaJornada}
+          onChange={e => setFechaJ(e.target.value)} />
+        <button style={{ ...E.btnGris, fontSize:"11px", padding:"4px 10px" }}
+          onClick={() => setFechaJ(fecha)}>Hoy</button>
+        {(esSupervisor || esAdmin) && (
+          <>
+            <label style={{ color:"#9ca3af", fontSize:"13px", marginLeft:"8px" }}>👤 Usuario:</label>
+            <select style={E.select} value={uidVer} onChange={e => setUidVer(e.target.value)}>
+              <option value={usuario?.id}>Mi jornada</option>
+              {operadores.filter(u => u.id !== usuario?.id).map(u => (
+                <option key={u.id} value={u.id}>{u.nombre} {u.apellido}</option>
+              ))}
+            </select>
+          </>
+        )}
+      </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",
         gap:"10px", marginBottom:"20px" }}>

@@ -331,8 +331,16 @@ async def crear_tarea(
 
     await db.flush()
 
+    # Resolver nombre para el log de auditoría
+    _nombre_row = await db.execute(sqlt("""
+        SELECT COALESCE(ct.nombre, t.nombre_personalizado, 'Sin nombre') AS nombre
+        FROM tareas t LEFT JOIN catalogo_tareas ct ON t.catalogo_tarea_id = ct.id
+        WHERE t.id = :id
+    """), {"id": nuevo_id})
+    _nombre_audit = (_nombre_row.fetchone() or type("x", (), {"nombre":"—"})()).nombre
     await registrar_auditoria(
         db, "tareas", nuevo_id, "INSERT",
+        campo="nombre", valor_nuevo=_nombre_audit,
         usuario_id=str(usuario_actual.id)
     )
 
@@ -1065,11 +1073,20 @@ async def eliminar_tarea(
         UPDATE tareas SET activa = FALSE WHERE id = :id
     """), {"id": str(tarea_id)})
  
+    _nr = await db.execute(sqlt("""
+        SELECT COALESCE(ct.nombre, t.nombre_personalizado, 'Sin nombre') AS nombre,
+               t.estado, t.prioridad, t.fecha_planificada
+        FROM tareas t LEFT JOIN catalogo_tareas ct ON t.catalogo_tarea_id = ct.id
+        WHERE t.id = :id
+    """), {"id": str(tarea_id)})
+    _nrf = _nr.fetchone()
+    _desc = f"{_nrf.nombre} | {_nrf.estado} | {_nrf.prioridad} | {_nrf.fecha_planificada}" if _nrf else "—"
     await registrar_auditoria(
         db, "tareas", str(tarea_id), "DELETE",
+        campo="nombre", valor_anterior=_desc,
         usuario_id=str(usuario_actual.id)
     )
- 
+
     return {"mensaje": "Tarea eliminada"}
 
 

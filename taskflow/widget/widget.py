@@ -31,7 +31,16 @@ _instancia_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
 try:
     _instancia_socket.bind(("127.0.0.1", 47291))
 except OSError:
-    sys.exit(0)  # Ya hay una instancia — salir sin mostrar error
+    # Ya hay una instancia corriendo — traerla al frente y salir
+    try:
+        import ctypes
+        hwnd = ctypes.windll.user32.FindWindowW(None, "TaskFlow Pro Widget")
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 9)       # SW_RESTORE
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+    except Exception:
+        pass
+    sys.exit(0)
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QListWidget, QListWidgetItem, QDialog,
@@ -39,7 +48,8 @@ from PyQt6.QtWidgets import (
     QSplashScreen, QFrame, QScrollArea, QButtonGroup, QRadioButton,
     QFileDialog, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSettings, QSize
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSettings, QSize, QDate
+from PyQt6.QtWidgets import QDateEdit
 from PyQt6.QtGui import QIcon, QColor, QPalette, QFont, QPixmap, QAction
 
 # ============================================================
@@ -640,14 +650,31 @@ class VistaJornada(QDialog):
         lbl_tit = QLabel("📅  Mi Jornada")
         lbl_tit.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         lbl_tit.setStyleSheet(f"color: {COLORES['acento']};")
-
-        self.lbl_fecha = QLabel(datetime.now().strftime("%A %d/%m/%Y"))
-        self.lbl_fecha.setFont(QFont("Segoe UI", 10))
-        self.lbl_fecha.setStyleSheet(f"color: {COLORES['texto_sec']};")
-
         row_header.addWidget(lbl_tit)
         row_header.addStretch()
-        row_header.addWidget(self.lbl_fecha)
+
+        # Selector de fecha
+        self.date_edit = QDateEdit()
+        self.date_edit.setDate(QDate.currentDate())
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDisplayFormat("dd/MM/yyyy")
+        self.date_edit.setStyleSheet(f"""
+            QDateEdit {{
+                background: {COLORES['fondo_card']}; color: {COLORES['texto']};
+                border: 1px solid #4B5563; border-radius: 6px;
+                padding: 4px 8px; font-size: 12px; min-width: 110px;
+            }}
+        """)
+        self.date_edit.dateChanged.connect(self._cargar)
+        row_header.addWidget(self.date_edit)
+
+        btn_hoy = QPushButton("Hoy")
+        btn_hoy.setFixedHeight(28)
+        btn_hoy.setFont(QFont("Segoe UI", 9))
+        btn_hoy.setStyleSheet(f"background:{COLORES['fondo_card']}; color:{COLORES['texto_sec']}; border:1px solid #4B5563; border-radius:5px; padding:2px 8px;")
+        btn_hoy.clicked.connect(lambda: self.date_edit.setDate(QDate.currentDate()))
+        row_header.addWidget(btn_hoy)
+
         main.addLayout(row_header)
 
         # ── Barra de stats + CSV (ítem 5: botón en área de stats, no extremo derecho) ──
@@ -723,8 +750,9 @@ class VistaJornada(QDialog):
         return w
 
     def _cargar(self):
-        """Llama al endpoint /tareas/para-jornada con fecha local de la máquina."""
-        fecha_local = date.today().isoformat()  # fecha local Windows, no UTC del servidor
+        """Llama al endpoint /tareas/para-jornada con la fecha seleccionada."""
+        q = self.date_edit.date()
+        fecha_local = f"{q.year()}-{q.month():02d}-{q.day():02d}"
         w = ApiWorker("GET", f"/tareas/para-jornada?fecha={fecha_local}", token=self.token)
         w.resultado.connect(self._mostrar)
         w.error.connect(lambda msg: self._mostrar_error(msg))

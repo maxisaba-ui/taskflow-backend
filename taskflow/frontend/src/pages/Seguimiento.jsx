@@ -354,7 +354,18 @@ function TabHistorial({ esSupervisor }) {
                       </span>
                     </td>
                     <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
-                      {fmtTiempo(t.tiempo_trabajado_minutos)}
+                      {(() => {
+                        let mins = t.tiempo_trabajado_minutos || 0;
+                        if (t.estado === "en_curso" && t.inicio_real) {
+                          mins += Math.floor((Date.now() - new Date(t.inicio_real)) / 60000);
+                        }
+                        const s = fmtTiempo(mins);
+                        return t.estado === "en_curso"
+                          ? <span style={{ color:"#10b981" }}>{s} ▶</span>
+                          : t.estado === "pausada"
+                          ? <span style={{ color:"#f59e0b" }}>{s} ⏸</span>
+                          : s;
+                      })()}
                     </td>
                   </tr>
                 );
