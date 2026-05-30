@@ -108,89 +108,129 @@ function calcularTiempoSinActividad(tareas) {
 
 // ── helpers de timeline ────────────────────────────────────
 
-const PRIO_COLOR = { urgente:"#ef4444", alta:"#f97316", media:"#eab308", baja:"#22c55e" };
+const PRIO_COLOR  = { urgente:"#ef4444", alta:"#f97316", media:"#eab308", baja:"#22c55e" };
 const ESTADO_COLOR = {
   pendiente:"#6b7280", en_curso:"#10b981", pausada:"#f59e0b",
   completada:"#3b82f6", validacion_pendiente:"#a855f7", vencida:"#ef4444",
 };
 
 function gapMinutos(isoDesde, isoHasta) {
-  try {
-    return Math.max(0, Math.round((new Date(isoHasta) - new Date(isoDesde)) / 60000));
-  } catch { return 0; }
+  try { return Math.max(0, Math.round((new Date(isoHasta) - new Date(isoDesde)) / 60000)); }
+  catch { return 0; }
+}
+
+function buildTimeline(items, toleranciaMin = 5) {
+  const conInicio = [...items.filter(i => i.inicio_real)]
+    .sort((a, b) => a.inicio_real.localeCompare(b.inicio_real));
+  const sinInicio = items.filter(i => !i.inicio_real);
+
+  const timeline = [];
+  let prevFin = null;
+  let grupoActual = null;  // { tarea_id, tarea_nombre, etapas, inicio, fin, ultimoFin }
+
+  const cerrarGrupo = () => {
+    if (grupoActual) { timeline.push({ tipo:"grupo_complejo", ...grupoActual }); grupoActual = null; }
+  };
+  const agregarGap = (desde, hasta) => {
+    if (desde && hasta) {
+      const g = gapMinutos(desde, hasta);
+      if (g >= toleranciaMin) timeline.push({ tipo:"gap", mins:g, desde, hasta });
+    }
+  };
+
+  for (const item of conInicio) {
+    const ini = item.inicio_real;
+    const fin = item.fin_real || ini;
+
+    if (item.tipo === "etapa_compleja") {
+      const tid = item.tarea_id;
+      if (grupoActual && grupoActual.tarea_id === tid) {
+        const gap = gapMinutos(grupoActual.ultimoFin, ini);
+        if (gap < toleranciaMin) {
+          grupoActual.etapas.push(item);
+          if (fin > grupoActual.ultimoFin) grupoActual.ultimoFin = fin;
+          if (fin > grupoActual.fin) grupoActual.fin = fin;
+          if (!prevFin || fin > prevFin) prevFin = fin;
+          continue;
+        } else {
+          cerrarGrupo();
+          agregarGap(prevFin, ini);
+        }
+      } else {
+        cerrarGrupo();
+        agregarGap(prevFin, ini);
+      }
+      grupoActual = { tarea_id: tid, tarea_nombre: item.tarea_nombre,
+        etapas: [item], inicio: ini, fin, ultimoFin: fin };
+    } else {
+      cerrarGrupo();
+      agregarGap(prevFin, ini);
+      timeline.push({ tipo:"simple", item });
+    }
+    if (!prevFin || fin > prevFin) prevFin = fin;
+  }
+  cerrarGrupo();
+  for (const item of sinInicio) timeline.push({ tipo:"simple", item });
+  return timeline;
 }
 
 function CardGap({ mins, horaDesde, horaHasta }) {
-  const h = Math.floor(mins / 60), m = mins % 60;
+  const h = Math.floor(mins/60), m = mins%60;
   const dur = h > 0 ? `${h}h ${m}m` : `${m}m`;
   return (
     <div style={{ display:"flex", alignItems:"center", gap:"10px",
-      padding:"6px 12px", margin:"2px 0",
-      background:"#0d1117", borderRadius:"6px",
-      border:"1px dashed #374151" }}>
-      <span style={{ fontSize:"14px", color:"#374151" }}>⏸</span>
+      padding:"5px 12px", margin:"2px 0",
+      background:"#0d1117", borderRadius:"6px", border:"1px dashed #374151" }}>
+      <span style={{ fontSize:"13px", color:"#374151" }}>⏸</span>
       <span style={{ fontSize:"11px", color:"#4b5563", fontStyle:"italic" }}>
-        Sin actividad — {dur}   ({horaDesde} → {horaHasta})
+        Sin actividad — {dur}&nbsp;&nbsp;({horaDesde} → {horaHasta})
       </span>
     </div>
   );
 }
 
-function CardActividad({ item, esPropio }) {
-  const tipo     = item.tipo || "tarea_simple";
-  const estado   = item.estado || "pendiente";
+function CardActividad({ item }) {
+  const tipo      = item.tipo || "tarea_simple";
+  const estado    = item.estado || "pendiente";
   const prioridad = item.prioridad || "media";
-  const colorEst = ESTADO_COLOR[estado]  || "#6b7280";
-  const colorPri = PRIO_COLOR[prioridad] || "#eab308";
-  const inicio   = fmtHora(item.inicio_real);
-  const fin      = fmtHora(item.fin_real);
-  const mins     = item.tiempo_trabajado_minutos || 0;
-  const cliente  = item.cliente_nombre || item.servicio_nombre || "—";
-
-  const esComplejo = tipo === "etapa_compleja";
+  const colorEst  = ESTADO_COLOR[estado]  || "#6b7280";
+  const colorPri  = PRIO_COLOR[prioridad] || "#eab308";
+  const inicio    = fmtHora(item.inicio_real);
+  const fin       = fmtHora(item.fin_real);
+  const mins      = item.tiempo_trabajado_minutos || 0;
+  const cliente   = item.cliente_nombre || item.servicio_nombre || "—";
+  const esC       = tipo === "etapa_compleja";
 
   return (
     <div style={{
-      background: esComplejo ? "#1a1533" : "#1f2937",
+      background: esC ? "#1a1533" : "#1f2937",
       borderRadius:"8px",
       borderTop:`3px solid ${colorPri}`,
       borderLeft:`3px solid ${colorEst}`,
-      padding:"10px 14px",
-      margin:"2px 0",
+      padding:"10px 14px", margin:"2px 0",
     }}>
-      {/* Contexto tarea compleja */}
-      {esComplejo && (
-        <div style={{ fontSize:"11px", color:"#a78bfa", fontWeight:"700",
-          marginBottom:"4px" }}>
+      {esC && (
+        <div style={{ fontSize:"11px", color:"#a78bfa", fontWeight:"700", marginBottom:"4px" }}>
           🔀 {item.tarea_nombre}
           <span style={{ fontWeight:"400", color:"#7c3aed" }}>
             {" "}→ Paso {item.etapa_orden} de {item.total_etapas}: {item.etapa_nombre}
           </span>
         </div>
       )}
-
-      {/* Nombre tarea simple */}
-      {!esComplejo && (
+      {!esC && (
         <div style={{ fontSize:"13px", fontWeight:"600", color:"white", marginBottom:"4px" }}>
           {item.tarea_nombre}
         </div>
       )}
-
-      {/* Fila meta */}
-      <div style={{ display:"flex", alignItems:"center", gap:"12px",
-        fontSize:"11px", color:"#9ca3af", flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:"12px", fontSize:"11px", color:"#9ca3af", flexWrap:"wrap", alignItems:"center" }}>
         <span style={{ fontWeight:"600", color:"#d1d5db" }}>
           {inicio}{fin ? ` → ${fin}` : " → en curso"}
         </span>
         <span>⏱ {fmtMinutos(mins)}</span>
         <span>📁 {cliente}</span>
-        <span style={{ marginLeft:"auto", color:colorEst, fontWeight:"600" }}>
-          {estado.replace(/_/g," ")}
-        </span>
+        <span style={{ marginLeft:"auto", color:colorEst, fontWeight:"600" }}>{estado.replace(/_/g," ")}</span>
         <span style={{ color:colorPri, fontWeight:"700" }}>● {prioridad.toUpperCase()}</span>
       </div>
-
-      {/* Comentarios */}
       {item.comentario_supervisor && (
         <div style={{ fontSize:"11px", color:"#93c5fd", fontStyle:"italic", marginTop:"4px" }}>
           👤 {item.comentario_supervisor}
@@ -205,6 +245,55 @@ function CardActividad({ item, esPropio }) {
   );
 }
 
+function CardGrupoComplejo({ grupo }) {
+  const etapas  = [...grupo.etapas].sort((a,b) => (a.etapa_orden||0)-(b.etapa_orden||0));
+  const totMins = etapas.reduce((s,e) => s+(e.tiempo_trabajado_minutos||0), 0);
+  const h = Math.floor(totMins/60), m = totMins%60;
+  const prioridad  = etapas[0]?.prioridad || "media";
+  const colorPri   = PRIO_COLOR[prioridad] || "#eab308";
+
+  return (
+    <div style={{
+      background:"#1a1533", borderRadius:"8px",
+      borderTop:`3px solid ${colorPri}`, borderLeft:"3px solid #7c3aed",
+      padding:"10px 14px", margin:"2px 0",
+    }}>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"flex-start", gap:"8px", marginBottom:"8px" }}>
+        <span style={{ fontSize:"14px" }}>🔀</span>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:"13px", fontWeight:"700", color:"#c4b5fd" }}>
+            {grupo.tarea_nombre}
+          </div>
+          <div style={{ fontSize:"11px", color:"#9ca3af", marginTop:"2px" }}>
+            {fmtHora(grupo.inicio)} → {fmtHora(grupo.fin) || "en curso"}
+            &nbsp;·&nbsp;⏱ {h > 0 ? `${h}h ` : ""}{m}m&nbsp;·&nbsp;{etapas.length} paso{etapas.length!==1?"s":""}
+          </div>
+        </div>
+      </div>
+      {/* Divisor */}
+      <div style={{ borderTop:"1px solid #2d1b69", marginBottom:"6px" }} />
+      {/* Pasos */}
+      {etapas.map(et => {
+        const colorE = ESTADO_COLOR[et.estado] || "#6b7280";
+        const mins_e = et.tiempo_trabajado_minutos || 0;
+        const he = Math.floor(mins_e/60), me = mins_e%60;
+        return (
+          <div key={et.id} style={{ display:"flex", alignItems:"center", gap:"8px",
+            padding:"4px 0", borderBottom:"1px solid #1e1040", fontSize:"12px" }}>
+            <span style={{ color:colorE, fontWeight:"700", minWidth:"20px" }}>{et.etapa_orden}.</span>
+            <span style={{ flex:1, color:"white" }}>{et.etapa_nombre}</span>
+            <span style={{ color:"#9ca3af", minWidth:"105px", textAlign:"center" }}>
+              {fmtHora(et.inicio_real)} → {fmtHora(et.fin_real) || "..."}
+            </span>
+            <span style={{ color:colorE, whiteSpace:"nowrap" }}>⏱ {he>0?`${he}h `:"" }{me}m</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Componente Mi Jornada ──────────────────────────────────
 
 function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
@@ -214,9 +303,8 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
   const [operadores, setOps] = useState([]);
 
   useEffect(() => {
-    if (esSupervisor || esAdmin) {
+    if (esSupervisor || esAdmin)
       api.get("/usuarios/").then(u => setOps(u || [])).catch(() => {});
-    }
   }, [esSupervisor, esAdmin]);
 
   useEffect(() => { cargar(); }, [fecha, uidVer]);
@@ -228,48 +316,22 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
       if (uidVer && uidVer !== usuario?.id) url += `&usuario_id=${uidVer}`;
       const data = await api.get(url);
       setItems(Array.isArray(data) ? data : []);
-    } catch(e) {
-      console.error(e);
-      setItems([]);
-    } finally { setCarg(false); }
+    } catch(e) { console.error(e); setItems([]); }
+    finally { setCarg(false); }
   }
 
-  // Stats
-  const totalMins   = items.reduce((s, i) => s + (i.tiempo_trabajado_minutos || 0), 0);
-  const completadas = items.filter(i => i.estado === "completada").length;
+  const totalMins    = items.reduce((s,i) => s+(i.tiempo_trabajado_minutos||0), 0);
+  const completadas  = items.filter(i => i.estado==="completada").length;
   const tiempoSinAct = calcularTiempoSinActividad(items);
-
-  // Construir timeline cronológico
-  const conInicio   = [...items.filter(i => i.inicio_real)]
-    .sort((a, b) => a.inicio_real.localeCompare(b.inicio_real));
-  const sinInicio   = items.filter(i => !i.inicio_real);
-
-  const timeline = [];
-  let prevFin = null;
-
-  for (const item of conInicio) {
-    if (prevFin && item.inicio_real) {
-      const gap = gapMinutos(prevFin, item.inicio_real);
-      if (gap >= 5) {
-        timeline.push({ tipo:"gap", mins:gap, desde:prevFin, hasta:item.inicio_real });
-      }
-    }
-    timeline.push({ tipo:"actividad", item });
-    const fin = item.fin_real || item.inicio_real;
-    if (!prevFin || fin > prevFin) prevFin = fin;
-  }
-  for (const item of sinInicio) timeline.push({ tipo:"actividad", item });
+  const timeline     = buildTimeline(items);
 
   return (
     <div style={{ color:"white" }}>
-
-      {/* Selector usuario */}
       {(esSupervisor || esAdmin) && (
         <div style={{ ...E.card, marginBottom:"16px", display:"flex",
           alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
           <label style={{ color:"#9ca3af", fontSize:"13px" }}>Ver jornada de:</label>
-          <select style={E.select} value={uidVer}
-            onChange={e => setUidVer(e.target.value)}>
+          <select style={E.select} value={uidVer} onChange={e => setUidVer(e.target.value)}>
             <option value={usuario?.id}>Mi jornada</option>
             {operadores.filter(u => u.id !== usuario?.id).map(u => (
               <option key={u.id} value={u.id}>{u.nombre} {u.apellido}</option>
@@ -278,44 +340,33 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
         </div>
       )}
 
-      {/* Stats */}
-      <div style={{ display:"grid",
-        gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",
         gap:"10px", marginBottom:"20px" }}>
         <StatCard label="Actividades"      valor={items.length}          color="gris"    />
         <StatCard label="Completadas"      valor={completadas}            color="esmeralda"/>
         <StatCard label="Tiempo trabajado" valor={fmtMinutos(totalMins)}  color="violeta"  />
         {tiempoSinAct !== null && (
-          <StatCard label="Sin actividad"
-            valor={fmtMinutos(tiempoSinAct)}
+          <StatCard label="Sin actividad" valor={fmtMinutos(tiempoSinAct)}
             color={tiempoSinAct > 60 ? "naranja" : "gris"} />
         )}
       </div>
 
-      {/* Timeline */}
       {cargando ? (
-        <div style={{ textAlign:"center", padding:"40px", color:"#6b7280" }}>
-          ⏳ Cargando jornada...
-        </div>
+        <div style={{ textAlign:"center", padding:"40px", color:"#6b7280" }}>⏳ Cargando jornada...</div>
       ) : timeline.length === 0 ? (
         <div style={{ ...E.card, textAlign:"center", padding:"40px" }}>
           <div style={{ fontSize:"32px", marginBottom:"10px" }}>📅</div>
-          <div style={{ color:"#9ca3af", fontSize:"14px" }}>
-            No hay actividad registrada para este día
-          </div>
+          <div style={{ color:"#9ca3af", fontSize:"14px" }}>No hay actividad registrada para este día</div>
         </div>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
           {timeline.map((entry, i) =>
-            entry.tipo === "gap" ? (
-              <CardGap key={`gap-${i}`}
-                mins={entry.mins}
-                horaDesde={fmtHora(entry.desde)}
-                horaHasta={fmtHora(entry.hasta)} />
-            ) : (
-              <CardActividad key={entry.item.id} item={entry.item}
-                esPropio={entry.item.asignado_a_id === usuario?.id} />
-            )
+            entry.tipo === "gap"
+              ? <CardGap key={`gap-${i}`} mins={entry.mins}
+                  horaDesde={fmtHora(entry.desde)} horaHasta={fmtHora(entry.hasta)} />
+              : entry.tipo === "grupo_complejo"
+              ? <CardGrupoComplejo key={entry.tarea_id + i} grupo={entry} />
+              : <CardActividad key={entry.item.id} item={entry.item} />
           )}
         </div>
       )}

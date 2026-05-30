@@ -763,11 +763,10 @@ class VistaJornada(QDialog):
         set_val(self.lbl_tiempo,      f"{hs}h {ms:02d}m")
 
     def _renderizar_items(self):
-        """Línea de tiempo cronológica con gaps de inactividad explícitos."""
+        """Línea de tiempo cronológica. Etapas de la misma tarea con gap<5min → tarjeta agrupada."""
         for i in reversed(range(self.layout_items.count())):
             it = self.layout_items.itemAt(i)
-            if it and it.widget():
-                it.widget().deleteLater()
+            if it and it.widget(): it.widget().deleteLater()
 
         if not self.items:
             lbl = QLabel("No hay actividad registrada hoy")
@@ -776,103 +775,194 @@ class VistaJornada(QDialog):
             self.layout_items.insertWidget(0, lbl)
             return
 
-        # Ordenar todos los items por inicio_real
         con_inicio = sorted(
             [i for i in self.items if i.get("inicio_real")],
             key=lambda x: x["inicio_real"]
         )
         sin_inicio = [i for i in self.items if not i.get("inicio_real")]
 
-        idx = 0
+        # Construir timeline con agrupación de etapas consecutivas (gap<5min)
+        timeline = []
+        prev_fin = None
+        grupo_actual = None  # dict con tarea_id, tarea_nombre, etapas, inicio, ultimo_fin
 
-        # Renderizar en orden cronológico con gaps
-        prev_fin_iso = None
+        def cerrar_grupo():
+            nonlocal grupo_actual
+            if grupo_actual:
+                timeline.append({"tipo": "grupo_complejo", **grupo_actual})
+                grupo_actual = None
+
+        def agregar_gap(desde, hasta):
+            if desde and hasta:
+                g = self._gap_minutos(desde, hasta)
+                if g >= 5:
+                    timeline.append({"tipo":"gap","mins":g,"desde":desde,"hasta":hasta})
+
         for item in con_inicio:
-            inicio_iso = item.get("inicio_real")
+            ini = item["inicio_real"]
+            fin = item.get("fin_real") or ini
+            tipo = item.get("tipo", "tarea_simple")
 
-            # Calcular gap desde la actividad anterior
-            if prev_fin_iso and inicio_iso:
-                gap_mins = self._gap_minutos(prev_fin_iso, inicio_iso)
-                if gap_mins >= 5:
-                    card_gap = self._crear_card_gap(gap_mins, self._fmt_hora(prev_fin_iso), self._fmt_hora(inicio_iso))
-                    self.layout_items.insertWidget(idx, card_gap)
-                    idx += 1
+            if tipo == "etapa_compleja":
+                tid = item.get("tarea_id")
+                if grupo_actual and grupo_actual["tarea_id"] == tid:
+                    gap = self._gap_minutos(grupo_actual["ultimo_fin"], ini)
+                    if gap < 5:
+                        # Agregar al grupo sin gap
+                        grupo_actual["etapas"].append(item)
+                        if fin > grupo_actual["ultimo_fin"]: grupo_actual["ultimo_fin"] = fin
+                        if fin > grupo_actual["fin"]: grupo_actual["fin"] = fin
+                        if not prev_fin or fin > prev_fin: prev_fin = fin
+                        continue
+                    else:
+                        # Gap >= 5 dentro de la misma tarea: cerrar grupo, mostrar gap, nuevo grupo
+                        cerrar_grupo()
+                        agregar_gap(prev_fin, ini)
+                else:
+                    cerrar_grupo()
+                    agregar_gap(prev_fin, ini)
+                grupo_actual = {"tarea_id": tid,
+                                "tarea_nombre": item.get("tarea_nombre","Tarea compleja"),
+                                "etapas": [item], "inicio": ini, "fin": fin, "ultimo_fin": fin}
+            else:
+                cerrar_grupo()
+                agregar_gap(prev_fin, ini)
+                timeline.append({"tipo":"simple","item":item})
 
-            card = self._crear_card_jornada(item)
-            self.layout_items.insertWidget(idx, card)
-            idx += 1
+            if not prev_fin or fin > prev_fin: prev_fin = fin
 
-            # Actualizar fin previo
-            fin_iso = item.get("fin_real")
-            if fin_iso:
-                if not prev_fin_iso or fin_iso > prev_fin_iso:
-                    prev_fin_iso = fin_iso
-            elif inicio_iso:
-                if not prev_fin_iso or inicio_iso > prev_fin_iso:
-                    prev_fin_iso = inicio_iso
-
-        # Items sin inicio al final
+        cerrar_grupo()
         for item in sin_inicio:
-            card = self._crear_card_jornada(item)
+            timeline.append({"tipo":"simple","item":item})
+
+        idx = 0
+        for entry in timeline:
+            if entry["tipo"] == "gap":
+                card = self._crear_card_gap(entry["mins"], self._fmt_hora(entry["desde"]), self._fmt_hora(entry["hasta"]))
+            elif entry["tipo"] == "simple":
+                card = self._crear_card_jornada(entry["item"])
+            else:
+                card = self._crear_card_grupo_complejo(entry)
             self.layout_items.insertWidget(idx, card)
             idx += 1
-
         self.layout_items.addStretch()
 
-    def _gap_minutos(self, iso_desde: str, iso_hasta: str) -> int:
-        """Calcula minutos entre dos ISO datetimes."""
+    def _gap_minutos(self, iso_desde, iso_hasta):
+        if not iso_desde or not iso_hasta: return 0
         try:
-            def _parse(s):
-                s = s.replace("T", " ")[:19]
-                return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
-            return max(0, int((_parse(iso_hasta) - _parse(iso_desde)).total_seconds() / 60))
-        except Exception:
-            return 0
+            def p(s): return datetime.strptime(s.replace("T"," ")[:19], "%Y-%m-%d %H:%M:%S")
+            return max(0, int((p(iso_hasta) - p(iso_desde)).total_seconds() / 60))
+        except Exception: return 0
 
-    def _crear_card_gap(self, mins: int, hora_desde: str, hora_hasta: str) -> QFrame:
-        """Tarjeta visual de período de inactividad entre dos actividades."""
+    def _crear_card_gap(self, mins, hora_desde, hora_hasta):
         hs = mins // 60; ms = mins % 60
-        duracion = f"{hs}h {ms:02d}m" if hs > 0 else f"{ms}m"
-
+        dur = f"{hs}h {ms:02d}m" if hs > 0 else f"{ms}m"
         card = QFrame()
-        card.setStyleSheet("""
-            QFrame {
-                background: #111827;
-                border-radius: 6px;
-                border: 1px dashed #374151;
-                margin: 1px 4px;
-            }
-        """)
+        card.setStyleSheet("QFrame { background:#111827; border-radius:6px; border:1px dashed #374151; margin:1px 4px; }")
         lay = QHBoxLayout(card)
         lay.setContentsMargins(10, 5, 10, 5)
-
-        lbl_ico = QLabel("⏸")
-        lbl_ico.setFont(QFont("Segoe UI", 10))
-        lbl_ico.setStyleSheet("color: #4B5563; border: none;")
-        lay.addWidget(lbl_ico)
-
-        lbl = QLabel(f"Sin actividad — {duracion}   ({hora_desde} – {hora_hasta})")
+        lbl = QLabel(f"⏸ Sin actividad — {dur}   ({hora_desde} – {hora_hasta})")
         lbl.setFont(QFont("Segoe UI", 9))
         lbl.setStyleSheet("color: #4B5563; border: none; font-style: italic;")
-        lay.addWidget(lbl, 1)
+        lay.addWidget(lbl)
+        return card
+
+    def _crear_card_grupo_complejo(self, grupo):
+        """Tarjeta para etapas de la misma tarea con ejecución consecutiva."""
+        tarea_nombre = grupo["tarea_nombre"]
+        etapas   = sorted(grupo["etapas"], key=lambda x: x.get("inicio_real",""))
+        inicio   = self._fmt_hora(grupo["inicio"])
+        fin      = self._fmt_hora(grupo["fin"])
+        tot_mins = sum(e.get("tiempo_trabajado_minutos") or 0 for e in etapas)
+        hs = tot_mins // 60; ms = tot_mins % 60
+        prioridad = etapas[0].get("prioridad","media") if etapas else "media"
+        color_pri = PRIO_COLOR.get(prioridad,"#EAB308")
+
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: #1A1533;
+                border-radius: 8px;
+                border-top: 3px solid {color_pri};
+                border-left: 3px solid #7C3AED;
+                margin: 2px 0;
+            }}
+        """)
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setSpacing(5)
+
+        # Header
+        row_h = QHBoxLayout()
+        lbl_tit = QLabel(f"\U0001f500  {tarea_nombre}")
+        lbl_tit.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        lbl_tit.setStyleSheet("color: #C4B5FD; border: none;")
+        lbl_tit.setWordWrap(True)
+        row_h.addWidget(lbl_tit, 1)
+        lbl_sp = QLabel(f"{inicio} → {fin}   ⏱ {hs}h{ms:02d}m")
+        lbl_sp.setFont(QFont("Segoe UI", 9))
+        lbl_sp.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
+        row_h.addWidget(lbl_sp)
+        lay.addLayout(row_h)
+
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("background: #2D1B69; max-height: 1px; border: none;")
+        lay.addWidget(sep)
+
+        # Pasos
+        for et in etapas:
+            ord_et  = et.get("etapa_orden","?")
+            nom_et  = et.get("etapa_nombre", f"Paso {ord_et}")
+            ini_et  = self._fmt_hora(et.get("inicio_real"))
+            fin_et  = self._fmt_hora(et.get("fin_real"))
+            mins_et = et.get("tiempo_trabajado_minutos") or 0
+            est_et  = et.get("estado","pendiente")
+            hs_e = mins_et // 60; ms_e = mins_et % 60
+            color_e = COLORES.get(est_et, COLORES["pendiente"])
+
+            row_e = QHBoxLayout()
+            row_e.setSpacing(8)
+
+            lbl_ord = QLabel(f"{ord_et}.")
+            lbl_ord.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            lbl_ord.setStyleSheet(f"color: {color_e}; border: none; min-width: 18px;")
+            row_e.addWidget(lbl_ord)
+
+            lbl_nom = QLabel(nom_et)
+            lbl_nom.setFont(QFont("Segoe UI", 10))
+            lbl_nom.setStyleSheet("color: white; border: none;")
+            lbl_nom.setWordWrap(True)
+            row_e.addWidget(lbl_nom, 1)
+
+            lbl_h = QLabel(f"{ini_et} → {fin_et or '...'}")
+            lbl_h.setFont(QFont("Segoe UI", 9))
+            lbl_h.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; min-width: 95px;")
+            row_e.addWidget(lbl_h)
+
+            lbl_t = QLabel(f"⏱ {hs_e}h{ms_e:02d}m")
+            lbl_t.setFont(QFont("Segoe UI", 9))
+            lbl_t.setStyleSheet(f"color: {color_e}; border: none;")
+            row_e.addWidget(lbl_t)
+
+            rw = QWidget(); rw.setLayout(row_e)
+            rw.setStyleSheet("background: transparent;")
+            lay.addWidget(rw)
 
         return card
 
-    def _crear_card_jornada(self, item: dict) -> QFrame:
-        """Tarjeta cronológica: borde izq=estado, borde sup=prioridad, muestra contexto complejo."""
-        tipo      = item.get("tipo", "tarea_simple")
-        estado    = item.get("estado", "pendiente")
-        nombre    = item.get("tarea_nombre", "Sin nombre")
+    def _crear_card_jornada(self, item):
+        tipo      = item.get("tipo","tarea_simple")
+        estado    = item.get("estado","pendiente")
+        nombre    = item.get("tarea_nombre","Sin nombre")
         cliente   = item.get("cliente_nombre") or item.get("servicio_nombre") or "—"
-        prioridad = item.get("prioridad", "media")
+        prioridad = item.get("prioridad","media")
         inicio    = self._fmt_hora(item.get("inicio_real"))
         fin       = self._fmt_hora(item.get("fin_real"))
         mins      = item.get("tiempo_trabajado_minutos") or 0
         color_est = COLORES.get(estado, COLORES["pendiente"])
-        color_pri = PRIO_COLOR.get(prioridad, "#EAB308")
-
-        is_complejo = (tipo == "etapa_compleja")
-        fondo = "#1A1533" if is_complejo else COLORES["fondo_card"]
+        color_pri = PRIO_COLOR.get(prioridad,"#EAB308")
+        is_c = (tipo == "etapa_compleja")
+        fondo = "#1A1533" if is_c else COLORES["fondo_card"]
 
         card = QFrame()
         card.setStyleSheet(f"""
@@ -888,51 +978,35 @@ class VistaJornada(QDialog):
         lay.setContentsMargins(10, 7, 10, 7)
         lay.setSpacing(3)
 
-        # Header tarea compleja
-        if is_complejo:
-            etapa_ord = item.get("etapa_orden", "?")
-            total_et  = item.get("total_etapas", "?")
-            etapa_nom = item.get("etapa_nombre", "")
-
-            lbl_ctx = QLabel(f"🔀  {nombre}   →  Paso {etapa_ord} de {total_et}: {etapa_nom}")
+        if is_c:
+            et_ord = item.get("etapa_orden","?"); tot_et = item.get("total_etapas","?")
+            et_nom = item.get("etapa_nombre","")
+            lbl_ctx = QLabel(f"\U0001f500  {nombre}   →  Paso {et_ord} de {tot_et}: {et_nom}")
             lbl_ctx.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
             lbl_ctx.setStyleSheet("color: #A78BFA; border: none;")
             lbl_ctx.setWordWrap(True)
             lay.addWidget(lbl_ctx)
         else:
-            # Nombre de tarea simple
             lbl_n = QLabel(nombre)
             lbl_n.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
             lbl_n.setStyleSheet(f"color: {COLORES['texto']}; border: none;")
             lbl_n.setWordWrap(True)
             lay.addWidget(lbl_n)
 
-        # Fila: hora inicio→fin · tiempo · cliente
         hs = mins // 60; ms = mins % 60
         hora_str = f"{inicio} → {fin}" if fin else f"{inicio} → en curso"
-        lbl_meta = QLabel(f"  {hora_str}   ⏱ {hs}h {ms:02d}m   📁 {cliente}")
-        lbl_meta.setFont(QFont("Segoe UI", 9))
-        lbl_meta.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
-        lay.addWidget(lbl_meta)
+        lbl_m = QLabel(f"  {hora_str}   ⏱ {hs}h {ms:02d}m   \U0001f4c1 {cliente}")
+        lbl_m.setFont(QFont("Segoe UI", 9))
+        lbl_m.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
+        lay.addWidget(lbl_m)
 
-        # Comentario supervisor
-        com_sup = item.get("comentario_supervisor") or ""
-        if com_sup:
-            lbl_sup = QLabel(f"👤 {com_sup}")
-            lbl_sup.setFont(QFont("Segoe UI", 9))
-            lbl_sup.setStyleSheet("color: #93C5FD; border: none; font-style: italic;")
-            lbl_sup.setWordWrap(True)
-            lay.addWidget(lbl_sup)
-
-        # Comentario operador
-        com_op = item.get("comentario_operador") or ""
-        if com_op:
-            lbl_op = QLabel(f"💬 {com_op}")
-            lbl_op.setFont(QFont("Segoe UI", 9))
-            lbl_op.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; font-style: italic;")
-            lbl_op.setWordWrap(True)
-            lay.addWidget(lbl_op)
-
+        for com, style in [
+            (item.get("comentario_supervisor",""), "color:#93C5FD; border:none; font-style:italic;"),
+            (item.get("comentario_operador",""),   f"color:{COLORES['texto_sec']}; border:none; font-style:italic;"),
+        ]:
+            if com:
+                l = QLabel(com); l.setFont(QFont("Segoe UI", 9))
+                l.setStyleSheet(style); l.setWordWrap(True); lay.addWidget(l)
         return card
 
     def _fmt_hora(self, iso: str | None) -> str:

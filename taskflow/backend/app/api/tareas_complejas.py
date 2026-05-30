@@ -496,7 +496,7 @@ async def pausar_etapa(
         raise HTTPException(400, "El motivo de la pausa es obligatorio")
 
     ahora       = datetime.now(TZ).replace(tzinfo=None)
-    mins_extra  = max(0, int((ahora - e.inicio_real).total_seconds() / 60)) if e.inicio_real else 0
+    mins_extra  = max(0, int((ahora - e.inicio_real.replace(tzinfo=None)).total_seconds() / 60)) if e.inicio_real else 0
     tiempo_acum = (e.tiempo_trabajado_minutos or 0) + mins_extra
 
     await db.execute(sqlt("""
@@ -544,7 +544,7 @@ async def finalizar_etapa(
         raise HTTPException(400, f"No se puede finalizar una etapa en estado '{e.estado}'")
 
     ahora       = datetime.now(TZ).replace(tzinfo=None)
-    mins_extra  = max(0, int((ahora - e.inicio_real).total_seconds() / 60)) if e.inicio_real else 0
+    mins_extra  = max(0, int((ahora - e.inicio_real.replace(tzinfo=None)).total_seconds() / 60)) if e.inicio_real else 0
     tiempo_total = (e.tiempo_trabajado_minutos or 0) + mins_extra
     ejec_id     = str(e.ejecucion_id)
 
