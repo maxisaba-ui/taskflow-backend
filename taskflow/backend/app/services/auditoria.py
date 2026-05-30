@@ -56,7 +56,7 @@ async def registrar_auditoria(
       El UUID del log se genera en Python para independencia del ORM.
     """
     nuevo_id = str(uuid.uuid4())  # UUID único para este registro de log
-    ahora    = datetime.now(TZ_ARG)  # Timestamp con timezone Argentina
+    ahora    = datetime.now(TZ_ARG).replace(tzinfo=None)  # Timestamp con timezone Argentina
 
     # Usar SQL directo para castear ip_address a INET
     # La columna en BD es de tipo inet — no acepta VARCHAR directamente

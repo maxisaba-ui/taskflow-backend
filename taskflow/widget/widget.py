@@ -763,54 +763,104 @@ class VistaJornada(QDialog):
         set_val(self.lbl_tiempo,      f"{hs}h {ms:02d}m")
 
     def _renderizar_items(self):
-        """
-        Ítem 8: agrupa etapas de la misma tarea compleja en un bloque expandible.
-        Las intervenciones de terceros aparecen como paso con estado 'en espera de [nombre]'.
-        """
-        # Limpiar widgets anteriores
+        """Línea de tiempo cronológica con gaps de inactividad explícitos."""
         for i in reversed(range(self.layout_items.count())):
             it = self.layout_items.itemAt(i)
             if it and it.widget():
                 it.widget().deleteLater()
 
         if not self.items:
-            lbl = QLabel("🎉 No hay actividad registrada hoy")
+            lbl = QLabel("No hay actividad registrada hoy")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet(f"color: {COLORES['texto_sec']}; padding: 20px;")
             self.layout_items.insertWidget(0, lbl)
             return
 
-        # Separar tareas simples y agrupar etapas por tarea_id
-        grupos_complejas = {}    # tarea_id → lista de etapas
-        simples          = []
-
-        for item in self.items:
-            if item.get("tipo") == "etapa_compleja":
-                tid = item.get("tarea_id", "?")
-                if tid not in grupos_complejas:
-                    grupos_complejas[tid] = []
-                grupos_complejas[tid].append(item)
-            else:
-                simples.append(item)
+        # Ordenar todos los items por inicio_real
+        con_inicio = sorted(
+            [i for i in self.items if i.get("inicio_real")],
+            key=lambda x: x["inicio_real"]
+        )
+        sin_inicio = [i for i in self.items if not i.get("inicio_real")]
 
         idx = 0
 
-        # Renderizar tareas simples
-        for item in simples:
+        # Renderizar en orden cronológico con gaps
+        prev_fin_iso = None
+        for item in con_inicio:
+            inicio_iso = item.get("inicio_real")
+
+            # Calcular gap desde la actividad anterior
+            if prev_fin_iso and inicio_iso:
+                gap_mins = self._gap_minutos(prev_fin_iso, inicio_iso)
+                if gap_mins >= 5:
+                    card_gap = self._crear_card_gap(gap_mins, self._fmt_hora(prev_fin_iso), self._fmt_hora(inicio_iso))
+                    self.layout_items.insertWidget(idx, card_gap)
+                    idx += 1
+
             card = self._crear_card_jornada(item)
             self.layout_items.insertWidget(idx, card)
             idx += 1
 
-        # Renderizar grupos de tareas complejas
-        for tarea_id, etapas in grupos_complejas.items():
-            bloque = self._crear_bloque_complejo(tarea_id, etapas)
-            self.layout_items.insertWidget(idx, bloque)
+            # Actualizar fin previo
+            fin_iso = item.get("fin_real")
+            if fin_iso:
+                if not prev_fin_iso or fin_iso > prev_fin_iso:
+                    prev_fin_iso = fin_iso
+            elif inicio_iso:
+                if not prev_fin_iso or inicio_iso > prev_fin_iso:
+                    prev_fin_iso = inicio_iso
+
+        # Items sin inicio al final
+        for item in sin_inicio:
+            card = self._crear_card_jornada(item)
+            self.layout_items.insertWidget(idx, card)
             idx += 1
 
         self.layout_items.addStretch()
 
+    def _gap_minutos(self, iso_desde: str, iso_hasta: str) -> int:
+        """Calcula minutos entre dos ISO datetimes."""
+        try:
+            def _parse(s):
+                s = s.replace("T", " ")[:19]
+                return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+            return max(0, int((_parse(iso_hasta) - _parse(iso_desde)).total_seconds() / 60))
+        except Exception:
+            return 0
+
+    def _crear_card_gap(self, mins: int, hora_desde: str, hora_hasta: str) -> QFrame:
+        """Tarjeta visual de período de inactividad entre dos actividades."""
+        hs = mins // 60; ms = mins % 60
+        duracion = f"{hs}h {ms:02d}m" if hs > 0 else f"{ms}m"
+
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background: #111827;
+                border-radius: 6px;
+                border: 1px dashed #374151;
+                margin: 1px 4px;
+            }
+        """)
+        lay = QHBoxLayout(card)
+        lay.setContentsMargins(10, 5, 10, 5)
+
+        lbl_ico = QLabel("⏸")
+        lbl_ico.setFont(QFont("Segoe UI", 10))
+        lbl_ico.setStyleSheet("color: #4B5563; border: none;")
+        lay.addWidget(lbl_ico)
+
+        lbl = QLabel(f"Sin actividad — {duracion}   ({hora_desde} – {hora_hasta})")
+        lbl.setFont(QFont("Segoe UI", 9))
+        lbl.setStyleSheet("color: #4B5563; border: none; font-style: italic;")
+        lay.addWidget(lbl, 1)
+
+        return card
+
     def _crear_card_jornada(self, item: dict) -> QFrame:
-        """Tarjeta de jornada: borde superior=prioridad, muestra comentarios."""
+        """Tarjeta cronológica: borde izq=estado, borde sup=prioridad, muestra contexto complejo."""
+        tipo      = item.get("tipo", "tarea_simple")
         estado    = item.get("estado", "pendiente")
         nombre    = item.get("tarea_nombre", "Sin nombre")
         cliente   = item.get("cliente_nombre") or item.get("servicio_nombre") or "—"
@@ -821,67 +871,60 @@ class VistaJornada(QDialog):
         color_est = COLORES.get(estado, COLORES["pendiente"])
         color_pri = PRIO_COLOR.get(prioridad, "#EAB308")
 
+        is_complejo = (tipo == "etapa_compleja")
+        fondo = "#1A1533" if is_complejo else COLORES["fondo_card"]
+
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame {{
-                background: {COLORES["fondo_card"]};
+                background: {fondo};
                 border-radius: 8px;
                 border-top: 3px solid {color_pri};
+                border-left: 3px solid {color_est};
                 margin: 2px 0;
             }}
         """)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setContentsMargins(10, 7, 10, 7)
         lay.setSpacing(3)
 
-        # Fila superior: hora inicio/fin + nombre
-        row_top = QHBoxLayout()
-        row_top.setSpacing(10)
+        # Header tarea compleja
+        if is_complejo:
+            etapa_ord = item.get("etapa_orden", "?")
+            total_et  = item.get("total_etapas", "?")
+            etapa_nom = item.get("etapa_nombre", "")
 
-        lbl_hora = QLabel(f"{inicio}\n{fin or '—'}")
-        lbl_hora.setFont(QFont("Segoe UI", 9))
-        lbl_hora.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; min-width: 46px;")
-        lbl_hora.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        row_top.addWidget(lbl_hora)
+            lbl_ctx = QLabel(f"🔀  {nombre}   →  Paso {etapa_ord} de {total_et}: {etapa_nom}")
+            lbl_ctx.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            lbl_ctx.setStyleSheet("color: #A78BFA; border: none;")
+            lbl_ctx.setWordWrap(True)
+            lay.addWidget(lbl_ctx)
+        else:
+            # Nombre de tarea simple
+            lbl_n = QLabel(nombre)
+            lbl_n.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            lbl_n.setStyleSheet(f"color: {COLORES['texto']}; border: none;")
+            lbl_n.setWordWrap(True)
+            lay.addWidget(lbl_n)
 
-        lbl_n = QLabel(nombre)
-        lbl_n.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        lbl_n.setStyleSheet(f"color: {COLORES['texto']}; border: none;")
-        lbl_n.setWordWrap(True)
-        row_top.addWidget(lbl_n, 1)
-
-        lay.addLayout(row_top)
-
-        # Fila meta: cliente · tiempo · prioridad · estado
-        row_meta = QHBoxLayout()
+        # Fila: hora inicio→fin · tiempo · cliente
         hs = mins // 60; ms = mins % 60
-        lbl_det = QLabel(f"📁 {cliente}   ⏱ {hs}h {ms:02d}m")
-        lbl_det.setFont(QFont("Segoe UI", 9))
-        lbl_det.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
-        row_meta.addWidget(lbl_det)
-        row_meta.addStretch()
+        hora_str = f"{inicio} → {fin}" if fin else f"{inicio} → en curso"
+        lbl_meta = QLabel(f"  {hora_str}   ⏱ {hs}h {ms:02d}m   📁 {cliente}")
+        lbl_meta.setFont(QFont("Segoe UI", 9))
+        lbl_meta.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
+        lay.addWidget(lbl_meta)
 
-        lbl_prio = QLabel(f"● {prioridad.upper()}")
-        lbl_prio.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
-        lbl_prio.setStyleSheet(f"color: {color_pri}; border: none;")
-        row_meta.addWidget(lbl_prio)
-
-        lbl_est = QLabel(f"  {estado.replace('_', ' ').upper()}")
-        lbl_est.setFont(QFont("Segoe UI", 8))
-        lbl_est.setStyleSheet(f"color: {color_est}; border: none;")
-        row_meta.addWidget(lbl_est)
-        lay.addLayout(row_meta)
-
-        # Comentario del supervisor
+        # Comentario supervisor
         com_sup = item.get("comentario_supervisor") or ""
         if com_sup:
-            lbl_sup = QLabel(f"👤 Supervisor: {com_sup}")
+            lbl_sup = QLabel(f"👤 {com_sup}")
             lbl_sup.setFont(QFont("Segoe UI", 9))
             lbl_sup.setStyleSheet("color: #93C5FD; border: none; font-style: italic;")
             lbl_sup.setWordWrap(True)
             lay.addWidget(lbl_sup)
 
-        # Comentario del operador
+        # Comentario operador
         com_op = item.get("comentario_operador") or ""
         if com_op:
             lbl_op = QLabel(f"💬 {com_op}")
@@ -891,121 +934,6 @@ class VistaJornada(QDialog):
             lay.addWidget(lbl_op)
 
         return card
-
-    def _crear_bloque_complejo(self, tarea_id: str, etapas: list) -> QFrame:
-        """
-        Ítem 8: bloque expandible con todas las etapas de una tarea compleja.
-        Las etapas de otros usuarios se muestran como 'en espera de [nombre]'.
-        """
-        tarea_nombre = etapas[0].get("tarea_nombre", "Tarea compleja") if etapas else "Tarea compleja"
-        total_mins   = sum(e.get("tiempo_trabajado_minutos") or 0 for e in etapas)
-        hs = total_mins // 60; ms = total_mins % 60
-
-        bloque = QFrame()
-        bloque.setStyleSheet(f"""
-            QFrame {{
-                background: #1E1B4B;
-                border-radius: 8px;
-                border: 1px solid #4C1D95;
-                margin: 2px 0;
-            }}
-        """)
-        lay_b = QVBoxLayout(bloque)
-        lay_b.setContentsMargins(10, 8, 10, 8)
-        lay_b.setSpacing(4)
-
-        # Cabecera del bloque (clicable para expandir/colapsar)
-        row_cab = QHBoxLayout()
-        self._expandido = {}   # estado local por bloque
-
-        lbl_cab = QLabel(f"🔀 {tarea_nombre}")
-        lbl_cab.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        lbl_cab.setStyleSheet("color: #C4B5FD; border: none;")
-        lbl_cab.setWordWrap(True)
-
-        lbl_resumen = QLabel(f"{len(etapas)} etapas · ⏱ {hs}h {ms:02d}m")
-        lbl_resumen.setFont(QFont("Segoe UI", 9))
-        lbl_resumen.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none;")
-
-        btn_expand = QPushButton("▼")
-        btn_expand.setFixedSize(24, 24)
-        btn_expand.setStyleSheet(f"background: #4C1D95; color: white; border: none; border-radius: 4px; font-size: 11px;")
-
-        row_cab.addWidget(lbl_cab)
-        row_cab.addStretch()
-        row_cab.addWidget(lbl_resumen)
-        row_cab.addWidget(btn_expand)
-        lay_b.addLayout(row_cab)
-
-        # Contenedor de etapas (expandible)
-        cont_etapas = QWidget()
-        lay_etapas  = QVBoxLayout(cont_etapas)
-        lay_etapas.setContentsMargins(0, 4, 0, 0)
-        lay_etapas.setSpacing(3)
-
-        # Necesitamos el uid del usuario actual — se obtiene del token decodificado
-        # Como simplificación, comparamos asignado_a_id con el primer item
-        uid_local = etapas[0].get("asignado_a_id", "") if etapas else ""
-
-        for et in sorted(etapas, key=lambda x: x.get("etapa_orden", 0)):
-            asignado  = et.get("asignado_a_id", "")
-            es_propio = (asignado == uid_local)
-            estado_et = et.get("estado", "")
-            nombre_et = et.get("etapa_nombre", f"Etapa {et.get('etapa_orden','?')}")
-            inicio_et = self._fmt_hora(et.get("inicio_real"))
-            fin_et    = self._fmt_hora(et.get("fin_real"))
-            mins_et   = et.get("tiempo_trabajado_minutos") or 0
-
-            if not es_propio:
-                # Etapa de otro usuario: mostrar como "en espera de [nombre]"
-                validador = et.get("validador_nombre") or "otro usuario"
-                lbl_ext = QLabel(f"   ⏳ {nombre_et} — en espera de {validador}")
-                lbl_ext.setFont(QFont("Segoe UI", 9))
-                lbl_ext.setStyleSheet("color: #818CF8; border: none; font-style: italic;")
-                lay_etapas.addWidget(lbl_ext)
-                continue
-
-            color_e = COLORES.get(estado_et, COLORES["pendiente"])
-            row_et  = QHBoxLayout()
-
-            lbl_ord = QLabel(f"  {et.get('etapa_orden','?')}.")
-            lbl_ord.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            lbl_ord.setStyleSheet(f"color: {color_e}; border: none; min-width: 22px;")
-            row_et.addWidget(lbl_ord)
-
-            lbl_et_hora = QLabel(f"{inicio_et}–{fin_et or '...'}")
-            lbl_et_hora.setFont(QFont("Segoe UI", 9))
-            lbl_et_hora.setStyleSheet(f"color: {COLORES['texto_sec']}; border: none; min-width: 90px;")
-            row_et.addWidget(lbl_et_hora)
-
-            lbl_et_nom = QLabel(nombre_et)
-            lbl_et_nom.setFont(QFont("Segoe UI", 9))
-            lbl_et_nom.setStyleSheet(f"color: {COLORES['texto']}; border: none;")
-            lbl_et_nom.setWordWrap(True)
-            row_et.addWidget(lbl_et_nom, 1)
-
-            hs_e = mins_et // 60; ms_e = mins_et % 60
-            lbl_et_t = QLabel(f"{hs_e}h{ms_e:02d}m")
-            lbl_et_t.setFont(QFont("Segoe UI", 9))
-            lbl_et_t.setStyleSheet(f"color: {color_e}; border: none;")
-            row_et.addWidget(lbl_et_t)
-
-            row_w = QWidget()
-            row_w.setLayout(row_et)
-            lay_etapas.addWidget(row_w)
-
-        cont_etapas.setVisible(False)
-        lay_b.addWidget(cont_etapas)
-
-        # Conectar expand/colapso
-        def toggle_expand(_, c=cont_etapas, b=btn_expand):
-            vis = not c.isVisible()
-            c.setVisible(vis)
-            b.setText("▲" if vis else "▼")
-
-        btn_expand.clicked.connect(toggle_expand)
-
-        return bloque
 
     def _fmt_hora(self, iso: str | None) -> str:
         """Extrae HH:MM de un ISO datetime."""

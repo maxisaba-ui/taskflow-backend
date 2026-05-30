@@ -456,7 +456,7 @@ async def iniciar_etapa(
     if en_curso.fetchone():
         raise HTTPException(400, "Ya hay una etapa en curso en esta tarea. Pausala o finalizala primero")
 
-    ahora = datetime.now(TZ)
+    ahora = datetime.now(TZ).replace(tzinfo=None)
     await db.execute(sqlt("""
         UPDATE tarea_compleja_etapas
         SET estado = 'en_curso', inicio_real = :ahora
@@ -495,7 +495,7 @@ async def pausar_etapa(
     if not datos.motivo:
         raise HTTPException(400, "El motivo de la pausa es obligatorio")
 
-    ahora       = datetime.now(TZ)
+    ahora       = datetime.now(TZ).replace(tzinfo=None)
     mins_extra  = max(0, int((ahora - e.inicio_real).total_seconds() / 60)) if e.inicio_real else 0
     tiempo_acum = (e.tiempo_trabajado_minutos or 0) + mins_extra
 
@@ -543,7 +543,7 @@ async def finalizar_etapa(
     if e.estado not in ("en_curso", "pendiente"):
         raise HTTPException(400, f"No se puede finalizar una etapa en estado '{e.estado}'")
 
-    ahora       = datetime.now(TZ)
+    ahora       = datetime.now(TZ).replace(tzinfo=None)
     mins_extra  = max(0, int((ahora - e.inicio_real).total_seconds() / 60)) if e.inicio_real else 0
     tiempo_total = (e.tiempo_trabajado_minutos or 0) + mins_extra
     ejec_id     = str(e.ejecucion_id)
@@ -667,7 +667,7 @@ async def _avanzar_o_completar(ejec_id: str, orden_completado: int, db: AsyncSes
 
         if conteo and conteo.total == conteo.completadas:
             # Todas completadas → cerrar ejecución y tarea global con hora Argentina
-            ahora_ar = datetime.now(TZ)
+            ahora_ar = datetime.now(TZ).replace(tzinfo=None)
             await db.execute(sqlt("""
                 UPDATE tarea_compleja_ejecucion
                 SET estado_general = 'completada', completada_en = :ahora
@@ -818,7 +818,7 @@ async def validar_etapa(
     if e.estado != "validacion_pendiente":
         raise HTTPException(400, f"La etapa no está en validacion_pendiente (estado: '{e.estado}')")
 
-    ahora  = datetime.now(TZ)
+    ahora  = datetime.now(TZ).replace(tzinfo=None)
     ejec_id = str(e.ejecucion_id)
 
     if datos.aprobada:

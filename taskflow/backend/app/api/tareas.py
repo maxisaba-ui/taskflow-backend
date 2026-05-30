@@ -777,7 +777,7 @@ async def iniciar_tarea(
     if tarea.estado not in ("pendiente", "pausada"):
         raise HTTPException(400, f"No se puede iniciar una tarea en estado '{tarea.estado}'")
 
-    ahora = datetime.now(TZ)
+    ahora = datetime.now(TZ).replace(tzinfo=None)
 
     estado_anterior = tarea.estado
     if tarea.estado == "pendiente":
@@ -824,7 +824,7 @@ async def pausar_tarea(
     if tarea.estado != "en_curso":
         raise HTTPException(400, f"No se puede pausar una tarea en estado '{tarea.estado}'")
 
-    ahora = datetime.now(TZ)
+    ahora = datetime.now(TZ).replace(tzinfo=None)
 
     # Registrar la pausa con SQL directo
     await db.execute(sqlt("""
@@ -870,7 +870,7 @@ async def reanudar_tarea(
     if tarea.estado != "pausada":
         raise HTTPException(400, "La tarea no está pausada")
 
-    ahora = datetime.now(TZ)
+    ahora = datetime.now(TZ).replace(tzinfo=None)
 
     # Cerrar la pausa activa (fin_pausa = ahora, calcular duración)
     await db.execute(sqlt("""
@@ -934,7 +934,7 @@ async def finalizar_tarea(
             "Solo se pueden finalizar tareas en curso."
         )
  
-    ahora = datetime.now(TZ)
+    ahora = datetime.now(TZ).replace(tzinfo=None)
  
     # Cerrar pausa activa si existe (por seguridad, aunque no deberia haber)
     await db.execute(sqlt("""

@@ -106,111 +106,189 @@ function calcularTiempoSinActividad(tareas) {
   return sinActividad;
 }
 
+// ── helpers de timeline ────────────────────────────────────
+
+const PRIO_COLOR = { urgente:"#ef4444", alta:"#f97316", media:"#eab308", baja:"#22c55e" };
+const ESTADO_COLOR = {
+  pendiente:"#6b7280", en_curso:"#10b981", pausada:"#f59e0b",
+  completada:"#3b82f6", validacion_pendiente:"#a855f7", vencida:"#ef4444",
+};
+
+function gapMinutos(isoDesde, isoHasta) {
+  try {
+    return Math.max(0, Math.round((new Date(isoHasta) - new Date(isoDesde)) / 60000));
+  } catch { return 0; }
+}
+
+function CardGap({ mins, horaDesde, horaHasta }) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  const dur = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:"10px",
+      padding:"6px 12px", margin:"2px 0",
+      background:"#0d1117", borderRadius:"6px",
+      border:"1px dashed #374151" }}>
+      <span style={{ fontSize:"14px", color:"#374151" }}>⏸</span>
+      <span style={{ fontSize:"11px", color:"#4b5563", fontStyle:"italic" }}>
+        Sin actividad — {dur}   ({horaDesde} → {horaHasta})
+      </span>
+    </div>
+  );
+}
+
+function CardActividad({ item, esPropio }) {
+  const tipo     = item.tipo || "tarea_simple";
+  const estado   = item.estado || "pendiente";
+  const prioridad = item.prioridad || "media";
+  const colorEst = ESTADO_COLOR[estado]  || "#6b7280";
+  const colorPri = PRIO_COLOR[prioridad] || "#eab308";
+  const inicio   = fmtHora(item.inicio_real);
+  const fin      = fmtHora(item.fin_real);
+  const mins     = item.tiempo_trabajado_minutos || 0;
+  const cliente  = item.cliente_nombre || item.servicio_nombre || "—";
+
+  const esComplejo = tipo === "etapa_compleja";
+
+  return (
+    <div style={{
+      background: esComplejo ? "#1a1533" : "#1f2937",
+      borderRadius:"8px",
+      borderTop:`3px solid ${colorPri}`,
+      borderLeft:`3px solid ${colorEst}`,
+      padding:"10px 14px",
+      margin:"2px 0",
+    }}>
+      {/* Contexto tarea compleja */}
+      {esComplejo && (
+        <div style={{ fontSize:"11px", color:"#a78bfa", fontWeight:"700",
+          marginBottom:"4px" }}>
+          🔀 {item.tarea_nombre}
+          <span style={{ fontWeight:"400", color:"#7c3aed" }}>
+            {" "}→ Paso {item.etapa_orden} de {item.total_etapas}: {item.etapa_nombre}
+          </span>
+        </div>
+      )}
+
+      {/* Nombre tarea simple */}
+      {!esComplejo && (
+        <div style={{ fontSize:"13px", fontWeight:"600", color:"white", marginBottom:"4px" }}>
+          {item.tarea_nombre}
+        </div>
+      )}
+
+      {/* Fila meta */}
+      <div style={{ display:"flex", alignItems:"center", gap:"12px",
+        fontSize:"11px", color:"#9ca3af", flexWrap:"wrap" }}>
+        <span style={{ fontWeight:"600", color:"#d1d5db" }}>
+          {inicio}{fin ? ` → ${fin}` : " → en curso"}
+        </span>
+        <span>⏱ {fmtMinutos(mins)}</span>
+        <span>📁 {cliente}</span>
+        <span style={{ marginLeft:"auto", color:colorEst, fontWeight:"600" }}>
+          {estado.replace(/_/g," ")}
+        </span>
+        <span style={{ color:colorPri, fontWeight:"700" }}>● {prioridad.toUpperCase()}</span>
+      </div>
+
+      {/* Comentarios */}
+      {item.comentario_supervisor && (
+        <div style={{ fontSize:"11px", color:"#93c5fd", fontStyle:"italic", marginTop:"4px" }}>
+          👤 {item.comentario_supervisor}
+        </div>
+      )}
+      {item.comentario_operador && (
+        <div style={{ fontSize:"11px", color:"#9ca3af", fontStyle:"italic", marginTop:"2px" }}>
+          💬 {item.comentario_operador}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Componente Mi Jornada ──────────────────────────────────
 
 function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
-  const [items, setItems]     = useState([]);
-  const [cargando, setCarg]   = useState(true);
-  const [uidVer, setUidVer]   = useState(usuario?.id || "");
-  const [operadores, setOps]  = useState([]);
-  const [expandidos, setExp]  = useState({});  // tarea_id → bool
+  const [items, setItems]    = useState([]);
+  const [cargando, setCarg]  = useState(true);
+  const [uidVer, setUidVer]  = useState(usuario?.id || "");
+  const [operadores, setOps] = useState([]);
 
-  // Cargar lista de usuarios si es supervisor/admin
   useEffect(() => {
     if (esSupervisor || esAdmin) {
       api.get("/usuarios/").then(u => setOps(u || [])).catch(() => {});
     }
   }, [esSupervisor, esAdmin]);
 
-  // Cargar jornada cuando cambia fecha o usuario seleccionado
-  useEffect(() => {
-    cargar();
-  }, [fecha, uidVer]);
+  useEffect(() => { cargar(); }, [fecha, uidVer]);
 
   async function cargar() {
     setCarg(true);
     try {
       let url = `/tareas/para-jornada?fecha=${fecha}`;
-      // Supervisor/admin puede ver la jornada de otro usuario
-      if (uidVer && uidVer !== usuario?.id) {
-        url += `&usuario_id=${uidVer}`;
-      }
+      if (uidVer && uidVer !== usuario?.id) url += `&usuario_id=${uidVer}`;
       const data = await api.get(url);
       setItems(Array.isArray(data) ? data : []);
     } catch(e) {
-      console.error("Error cargando jornada:", e);
+      console.error(e);
       setItems([]);
-    } finally {
-      setCarg(false);
-    }
+    } finally { setCarg(false); }
   }
 
-  // Calcular stats de la jornada
-  const totalMins    = items.reduce((s, i) => s + (i.tiempo_trabajado_minutos || 0), 0);
-  const completadas  = items.filter(i => i.estado === "completada").length;
+  // Stats
+  const totalMins   = items.reduce((s, i) => s + (i.tiempo_trabajado_minutos || 0), 0);
+  const completadas = items.filter(i => i.estado === "completada").length;
   const tiempoSinAct = calcularTiempoSinActividad(items);
 
-  // Agrupar etapas complejas bajo su tarea_id
-  const grupos = {};   // tarea_id → lista etapas
-  const simples = [];
-  for (const item of items) {
-    if (item.tipo === "etapa_compleja") {
-      if (!grupos[item.tarea_id]) grupos[item.tarea_id] = [];
-      grupos[item.tarea_id].push(item);
-    } else {
-      simples.push(item);
+  // Construir timeline cronológico
+  const conInicio   = [...items.filter(i => i.inicio_real)]
+    .sort((a, b) => a.inicio_real.localeCompare(b.inicio_real));
+  const sinInicio   = items.filter(i => !i.inicio_real);
+
+  const timeline = [];
+  let prevFin = null;
+
+  for (const item of conInicio) {
+    if (prevFin && item.inicio_real) {
+      const gap = gapMinutos(prevFin, item.inicio_real);
+      if (gap >= 5) {
+        timeline.push({ tipo:"gap", mins:gap, desde:prevFin, hasta:item.inicio_real });
+      }
     }
+    timeline.push({ tipo:"actividad", item });
+    const fin = item.fin_real || item.inicio_real;
+    if (!prevFin || fin > prevFin) prevFin = fin;
   }
-
-  const COLORES_ESTADO = {
-    pendiente:           "#6b7280",
-    en_curso:            "#10b981",
-    pausada:             "#f59e0b",
-    completada:          "#3b82f6",
-    validacion_pendiente:"#a855f7",
-    vencida:             "#ef4444",
-  };
-
-  function toggleExp(id) {
-    setExp(prev => ({ ...prev, [id]: !prev[id] }));
-  }
+  for (const item of sinInicio) timeline.push({ tipo:"actividad", item });
 
   return (
     <div style={{ color:"white" }}>
 
-      {/* Selector de operador para supervisores */}
+      {/* Selector usuario */}
       {(esSupervisor || esAdmin) && (
         <div style={{ ...E.card, marginBottom:"16px", display:"flex",
           alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
           <label style={{ color:"#9ca3af", fontSize:"13px" }}>Ver jornada de:</label>
-          <select style={E.select}
-            value={uidVer}
+          <select style={E.select} value={uidVer}
             onChange={e => setUidVer(e.target.value)}>
             <option value={usuario?.id}>Mi jornada</option>
-            {operadores
-              .filter(u => u.id !== usuario?.id)
-              .map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.nombre} {u.apellido}
-                </option>
-              ))}
+            {operadores.filter(u => u.id !== usuario?.id).map(u => (
+              <option key={u.id} value={u.id}>{u.nombre} {u.apellido}</option>
+            ))}
           </select>
         </div>
       )}
 
-      {/* Stats de jornada */}
+      {/* Stats */}
       <div style={{ display:"grid",
         gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",
         gap:"10px", marginBottom:"20px" }}>
-        <StatCard label="Ítems jornada"   valor={items.length}          color="gris"    />
+        <StatCard label="Actividades"      valor={items.length}          color="gris"    />
         <StatCard label="Completadas"      valor={completadas}            color="esmeralda"/>
         <StatCard label="Tiempo trabajado" valor={fmtMinutos(totalMins)}  color="violeta"  />
         {tiempoSinAct !== null && (
-          <StatCard
-            label="Sin actividad"
+          <StatCard label="Sin actividad"
             valor={fmtMinutos(tiempoSinAct)}
-            color={tiempoSinAct > 60 ? "naranja" : "gris"}
-          />
+            color={tiempoSinAct > 60 ? "naranja" : "gris"} />
         )}
       </div>
 
@@ -219,7 +297,7 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
         <div style={{ textAlign:"center", padding:"40px", color:"#6b7280" }}>
           ⏳ Cargando jornada...
         </div>
-      ) : items.length === 0 ? (
+      ) : timeline.length === 0 ? (
         <div style={{ ...E.card, textAlign:"center", padding:"40px" }}>
           <div style={{ fontSize:"32px", marginBottom:"10px" }}>📅</div>
           <div style={{ color:"#9ca3af", fontSize:"14px" }}>
@@ -227,132 +305,18 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
           </div>
         </div>
       ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-
-          {/* Tareas simples */}
-          {simples.map(item => {
-            const color = COLORES_ESTADO[item.estado] || "#6b7280";
-            return (
-              <div key={item.id} style={{ ...E.card, padding:"10px 14px",
-                borderLeft:`4px solid ${color}`, display:"flex",
-                alignItems:"center", gap:"12px" }}>
-                {/* Hora de inicio y fin */}
-                <div style={{ minWidth:"58px", textAlign:"center",
-                  fontSize:"12px", color:"#9ca3af" }}>
-                  <div style={{ fontWeight:"600" }}>{fmtHora(item.inicio_real)}</div>
-                  <div>{fmtHora(item.fin_real) || "—"}</div>
-                </div>
-
-                {/* Separador */}
-                <div style={{ width:"2px", alignSelf:"stretch",
-                  background:color, borderRadius:"2px", flexShrink:0 }} />
-
-                {/* Info tarea */}
-                <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:"600", fontSize:"13px",
-                    color:"white", marginBottom:"2px" }}>
-                    {item.tarea_nombre}
-                  </div>
-                  <div style={{ fontSize:"11px", color:"#9ca3af" }}>
-                    {item.cliente_nombre || item.servicio_nombre || "—"}
-                    {" · "}⏱ {fmtMinutos(item.tiempo_trabajado_minutos)}
-                  </div>
-                </div>
-
-                {/* Badge estado */}
-                <div style={{ fontSize:"11px", padding:"2px 8px",
-                  borderRadius:"8px", background:`${color}22`, color,
-                  fontWeight:"600", whiteSpace:"nowrap" }}>
-                  {item.estado.replace("_"," ")}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Grupos de tareas complejas */}
-          {Object.entries(grupos).map(([tarea_id, etapas]) => {
-            const tarea_nombre = etapas[0]?.tarea_nombre || "Tarea compleja";
-            const totalGrupo   = etapas.reduce((s, e) => s + (e.tiempo_trabajado_minutos || 0), 0);
-            const abierto      = expandidos[tarea_id];
-
-            return (
-              <div key={tarea_id} style={{
-                background:"#1e1b4b",
-                borderRadius:"10px",
-                border:"1px solid #4c1d95",
-                overflow:"hidden" }}>
-
-                {/* Cabecera del grupo */}
-                <div
-                  onClick={() => toggleExp(tarea_id)}
-                  style={{ display:"flex", alignItems:"center", gap:"10px",
-                    padding:"10px 14px", cursor:"pointer",
-                    borderBottom: abierto ? "1px solid #4c1d95" : "none" }}>
-                  <span style={{ fontSize:"16px" }}>🔀</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:"600", fontSize:"13px", color:"#c4b5fd" }}>
-                      {tarea_nombre}
-                    </div>
-                    <div style={{ fontSize:"11px", color:"#9ca3af" }}>
-                      {etapas.length} etapa{etapas.length!==1?"s":""} · ⏱ {fmtMinutos(totalGrupo)}
-                    </div>
-                  </div>
-                  <span style={{ color:"#c4b5fd", fontSize:"12px" }}>
-                    {abierto ? "▲ Colapsar" : "▼ Expandir"}
-                  </span>
-                </div>
-
-                {/* Detalle de etapas */}
-                {abierto && (
-                  <div style={{ padding:"8px 14px 10px" }}>
-                    {etapas
-                      .sort((a, b) => (a.etapa_orden || 0) - (b.etapa_orden || 0))
-                      .map(et => {
-                        const colorEt = COLORES_ESTADO[et.estado] || "#6b7280";
-                        // Etapas de otro usuario: mostrar como "en espera de"
-                        const esPropio = et.asignado_a_id === usuario?.id;
-                        if (!esPropio) {
-                          const valNom = et.validador_nombre || "otro usuario";
-                          return (
-                            <div key={et.id} style={{ display:"flex",
-                              alignItems:"center", gap:"8px",
-                              padding:"5px 0", borderBottom:"1px solid #2e2260",
-                              fontSize:"12px", color:"#818cf8", fontStyle:"italic" }}>
-                              <span>⏳</span>
-                              <span>{et.etapa_nombre} — en espera de {valNom}</span>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={et.id} style={{ display:"flex",
-                            alignItems:"center", gap:"10px",
-                            padding:"5px 0", borderBottom:"1px solid #2e2260" }}>
-                            <span style={{ fontSize:"11px", color:colorEt,
-                              fontWeight:"700", minWidth:"18px" }}>
-                              {et.etapa_orden}.
-                            </span>
-                            <div style={{ minWidth:"90px", fontSize:"11px",
-                              color:"#9ca3af", textAlign:"center" }}>
-                              <div>{fmtHora(et.inicio_real)}</div>
-                              <div>{fmtHora(et.fin_real) || "—"}</div>
-                            </div>
-                            <div style={{ flex:1, fontSize:"12px", color:"white" }}>
-                              {et.etapa_nombre}
-                            </div>
-                            <div style={{ fontSize:"11px", color:colorEt,
-                              whiteSpace:"nowrap" }}>
-                              ⏱ {fmtMinutos(et.tiempo_trabajado_minutos)}
-                            </div>
-                          </div>
-                        );
-                      })
-                    }
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
+        <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+          {timeline.map((entry, i) =>
+            entry.tipo === "gap" ? (
+              <CardGap key={`gap-${i}`}
+                mins={entry.mins}
+                horaDesde={fmtHora(entry.desde)}
+                horaHasta={fmtHora(entry.hasta)} />
+            ) : (
+              <CardActividad key={entry.item.id} item={entry.item}
+                esPropio={entry.item.asignado_a_id === usuario?.id} />
+            )
+          )}
         </div>
       )}
     </div>
