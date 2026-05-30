@@ -25,7 +25,7 @@ from typing import Optional                                    # Tipos opcionale
 from datetime import date                                      # Fechas de alta/baja
 
 from app.core.database import get_db                           # Dependencia de sesión de BD
-from app.api.auth import obtener_usuario_actual                # Dependencia de autenticación
+from app.api.auth import obtener_usuario_actual, obtener_empresa_id  # Dependencia de autenticación
 from app.models.usuario import Usuario, UsuarioPerfil, Perfil, SupervisorOperador  # Modelos ORM
 
 router = APIRouter()
@@ -83,28 +83,33 @@ async def obtener_perfiles_usuario(db: AsyncSession, usuario_id: str) -> list[st
 
 @router.get("/")
 async def listar_usuarios(
-    activo: bool = True,                                        # Filtro por estado activo
+    activo: bool = True,
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    DESCRIPCIÓN FUNCIONAL:
-      Lista usuarios con su información completa incluyendo perfiles activos.
-    DESCRIPCIÓN TÉCNICA:
-      Consulta usuarios y luego enriquece cada uno con sus perfiles via
-      función auxiliar. Ordena por apellido.
-    """
-    # Consultar usuarios según filtro de estado activo
-    result = await db.execute(
-        select(Usuario)
-        .where(Usuario.activo == activo)
-        .order_by(Usuario.apellido, Usuario.nombre)
-    )
-    usuarios = result.scalars().all()
+    """Lista usuarios de la empresa activa con sus perfiles."""
+    if empresa_id:
+        # Solo usuarios asignados a esta empresa
+        result = await db.execute(text("""
+            SELECT u.id, u.email, u.nombre, u.apellido, u.foto_url, u.activo
+            FROM usuarios u
+            JOIN usuario_empresas ue ON ue.usuario_id = u.id
+            WHERE ue.empresa_id = :eid AND ue.activo = TRUE
+              AND u.activo = :activo
+            ORDER BY u.apellido, u.nombre
+        """), {"eid": empresa_id, "activo": activo})
+        filas = result.fetchall()
+    else:
+        result = await db.execute(
+            select(Usuario)
+            .where(Usuario.activo == activo)
+            .order_by(Usuario.apellido, Usuario.nombre)
+        )
+        filas = result.scalars().all()
 
-    # Enriquecer cada usuario con sus perfiles activos
     lista = []
-    for u in usuarios:
+    for u in filas:
         perfiles = await obtener_perfiles_usuario(db, str(u.id))
         lista.append({
             "id":       str(u.id),
@@ -113,7 +118,7 @@ async def listar_usuarios(
             "apellido": u.apellido,
             "foto_url": u.foto_url,
             "activo":   u.activo,
-            "perfiles": perfiles,   # Lista de códigos: ["operador", "supervisor"]
+            "perfiles": perfiles,
         })
     return lista
 
@@ -127,6 +132,7 @@ async def listar_usuarios(
 async def crear_usuario(
     datos: UsuarioCrear,
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -172,6 +178,17 @@ async def crear_usuario(
             db.add(up)
 
     await db.flush()
+
+    # Asignar automáticamente el usuario a la empresa activa del creador
+    if empresa_id:
+        import uuid as _uuid
+        await db.execute(text("""
+            INSERT INTO usuario_empresas (id, usuario_id, empresa_id, activo, fecha_alta, creado_en)
+            VALUES (:id, :uid, :eid, TRUE, CURRENT_DATE, NOW())
+            ON CONFLICT (usuario_id, empresa_id) DO NOTHING
+        """), {"id": str(_uuid.uuid4()), "uid": str(usuario.id), "eid": empresa_id})
+        await db.flush()
+
     return {"id": str(usuario.id), "mensaje": "Usuario creado correctamente"}
 
 

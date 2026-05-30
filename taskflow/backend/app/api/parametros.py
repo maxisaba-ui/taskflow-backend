@@ -282,14 +282,17 @@ async def quitar_usuario_empresa(
 async def listar_feriados(
     anio: Optional[int] = Query(default=None),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
     if anio is None:
         anio = date.today().year
-    result = await db.execute(text("""
+    filtro_emp = "AND empresa_id = :eid" if empresa_id else ""
+    params = {"anio": anio, **({"eid": empresa_id} if empresa_id else {})}
+    result = await db.execute(text(f"""
         SELECT id, fecha, nombre, tipo, anio
-        FROM feriados WHERE anio = :anio AND activo = TRUE ORDER BY fecha
-    """), {"anio": anio})
+        FROM feriados WHERE anio = :anio AND activo = TRUE {filtro_emp} ORDER BY fecha
+    """), params)
     return [{"id": str(f.id), "fecha": f.fecha.isoformat(),
              "nombre": f.nombre, "tipo": f.tipo, "anio": f.anio}
             for f in result.fetchall()]
@@ -417,10 +420,13 @@ async def eliminar_feriado(
 async def listar_catalogo(
     activo: bool = Query(default=True),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Lista tareas del catálogo con prioridad_default incluida."""
-    result = await db.execute(text("""
+    filtro_emp = "AND ct.empresa_id = :eid" if empresa_id else ""
+    params = {"activo": activo, **({"eid": empresa_id} if empresa_id else {})}
+    result = await db.execute(text(f"""
         SELECT ct.id, ct.codigo, ct.nombre, ct.descripcion,
                ct.duracion_estimada_minutos, ct.requiere_cliente,
                ct.es_compleja, ct.activo,
@@ -430,9 +436,9 @@ async def listar_catalogo(
                rt.nombre AS rubro, rt.color_hex AS rubro_color
         FROM catalogo_tareas ct
         LEFT JOIN rubros_tarea rt ON ct.rubro_id = rt.id
-        WHERE ct.activo = :activo
+        WHERE ct.activo = :activo {filtro_emp}
         ORDER BY rt.nombre, ct.nombre
-    """), {"activo": activo})
+    """), params)
     return [
         {
             "id":                        str(t.id),
@@ -559,12 +565,15 @@ async def desactivar_tarea_catalogo(
 @router.get("/rubros")
 async def listar_rubros(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(text("""
+    filtro_emp = "AND empresa_id = :eid" if empresa_id else ""
+    params = {"eid": empresa_id} if empresa_id else {}
+    result = await db.execute(text(f"""
         SELECT id, codigo, nombre, color_hex, icono, orden
-        FROM rubros_tarea WHERE activo = TRUE ORDER BY orden, nombre
-    """))
+        FROM rubros_tarea WHERE activo = TRUE {filtro_emp} ORDER BY orden, nombre
+    """), params)
     return [{"id": str(r.id), "codigo": r.codigo, "nombre": r.nombre,
              "color_hex": r.color_hex, "icono": r.icono}
             for r in result.fetchall()]
