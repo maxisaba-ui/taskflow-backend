@@ -445,8 +445,8 @@ async def iniciar_etapa(
         raise HTTPException(404, "Etapa no encontrada")
     if str(e.asignado_a_id) != str(usuario_actual.id):
         raise HTTPException(403, "Solo el asignado puede iniciar esta etapa")
-    if e.estado != "pendiente":
-        raise HTTPException(400, f"La etapa está en estado '{e.estado}'. Solo se puede iniciar desde 'pendiente'")
+    if e.estado not in ("pendiente", "pausada"):
+        raise HTTPException(400, f"La etapa está en estado '{e.estado}'. Solo se puede iniciar desde 'pendiente' o 'pausada'")
 
     # Verificar que no haya otra etapa en curso
     en_curso = await db.execute(sqlt("""
@@ -501,7 +501,7 @@ async def pausar_etapa(
 
     await db.execute(sqlt("""
         UPDATE tarea_compleja_etapas SET
-            estado                   = 'pendiente',
+            estado                   = 'pausada',
             inicio_real              = NULL,
             tiempo_trabajado_minutos = :tiempo,
             comentario_operador      = COALESCE(:com, comentario_operador)
