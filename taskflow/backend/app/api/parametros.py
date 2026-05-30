@@ -41,6 +41,18 @@ class EmpresaActualizar(BaseModel):
     horario_fin_default: Optional[str] = None
     email_notificaciones: Optional[str] = None
     zona_horaria: Optional[str] = None
+    color_primario: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_puerto: Optional[int] = None
+    smtp_usuario: Optional[str] = None
+    smtp_password_enc: Optional[str] = None
+
+
+class EmpresaCrear(BaseModel):
+    nombre: str
+    zona_horaria: str = "America/Argentina/Buenos_Aires"
+    color_primario: Optional[str] = "#6366f1"
+    email_notificaciones: Optional[str] = None
 
 
 class FeriadoCrear(BaseModel):
@@ -79,14 +91,18 @@ class CatalogoTareaCrear(BaseModel):
 @router.get("/empresa")
 async def obtener_empresa(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(text("""
+    filtro = "WHERE id = :eid" if empresa_id else "WHERE activa = TRUE LIMIT 1"
+    params = {"eid": empresa_id} if empresa_id else {}
+    result = await db.execute(text(f"""
         SELECT id, nombre, logo_url, icono_url, zona_horaria,
                horario_inicio_default::TEXT, horario_fin_default::TEXT,
-               email_notificaciones
-        FROM empresas WHERE activa = TRUE LIMIT 1
-    """))
+               email_notificaciones, color_primario,
+               smtp_host, smtp_puerto, smtp_usuario, activa
+        FROM empresas {filtro}
+    """), params)
     empresa = result.fetchone()
     if not empresa:
         return {"nombre": "Mi Estudio Contable"}
@@ -97,6 +113,11 @@ async def obtener_empresa(
         "horario_inicio_default": empresa.horario_inicio_default,
         "horario_fin_default": empresa.horario_fin_default,
         "email_notificaciones": empresa.email_notificaciones,
+        "color_primario": empresa.color_primario or "#6366f1",
+        "smtp_host": empresa.smtp_host,
+        "smtp_puerto": empresa.smtp_puerto,
+        "smtp_usuario": empresa.smtp_usuario,
+        "activa": empresa.activa,
     }
 
 
@@ -104,18 +125,152 @@ async def obtener_empresa(
 async def actualizar_empresa(
     datos: EmpresaActualizar,
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.api.tareas import _obtener_perfiles
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if "administrador" not in perfiles and "dueno" not in perfiles:
+        raise HTTPException(403, "Solo administradores y dueños pueden editar la empresa")
     campos = {k: v for k, v in datos.dict().items() if v is not None}
     if not campos:
         return {"mensaje": "Sin cambios"}
     set_clause = ", ".join(f"{k} = :{k}" for k in campos)
-    await db.execute(text(f"""
-        UPDATE empresas SET {set_clause}, actualizado_en = NOW()
-        WHERE activa = TRUE
-    """), campos)
+    filtro = "WHERE id = :eid" if empresa_id else "WHERE activa = TRUE"
+    params = {**campos}
+    if empresa_id:
+        params["eid"] = empresa_id
+    await db.execute(text(f"UPDATE empresas SET {set_clause}, actualizado_en = NOW() {filtro}"), params)
     await db.flush()
     return {"mensaje": "Configuración guardada correctamente"}
+
+
+# ── Admin: listar y crear empresas ──────────────────────────────
+
+@router.get("/empresas")
+async def listar_empresas(
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    db: AsyncSession = Depends(get_db)
+):
+    """Lista todas las empresas. Solo admin/dueño."""
+    from app.api.tareas import _obtener_perfiles
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if "administrador" not in perfiles and "dueno" not in perfiles:
+        raise HTTPException(403, "Solo administradores y dueños pueden ver todas las empresas")
+    result = await db.execute(text("""
+        SELECT e.id, e.nombre, e.logo_url, e.color_primario, e.activa,
+               e.email_notificaciones, e.zona_horaria,
+               COUNT(ue.usuario_id) AS total_usuarios
+        FROM empresas e
+        LEFT JOIN usuario_empresas ue ON ue.empresa_id = e.id AND ue.activo = TRUE
+        GROUP BY e.id, e.nombre, e.logo_url, e.color_primario, e.activa,
+                 e.email_notificaciones, e.zona_horaria
+        ORDER BY e.nombre
+    """))
+    return [{"id": str(r.id), "nombre": r.nombre, "logo_url": r.logo_url,
+             "color_primario": r.color_primario or "#6366f1", "activa": r.activa,
+             "email_notificaciones": r.email_notificaciones,
+             "zona_horaria": r.zona_horaria,
+             "total_usuarios": r.total_usuarios}
+            for r in result.fetchall()]
+
+
+@router.post("/empresas", status_code=201)
+async def crear_empresa(
+    datos: EmpresaCrear,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    db: AsyncSession = Depends(get_db)
+):
+    """Crea una nueva empresa y asigna al usuario actual como admin."""
+    from app.api.tareas import _obtener_perfiles
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if "administrador" not in perfiles and "dueno" not in perfiles:
+        raise HTTPException(403, "Solo administradores y dueños pueden crear empresas")
+    import uuid as uuid_mod
+    nuevo_id = str(uuid_mod.uuid4())
+    await db.execute(text("""
+        INSERT INTO empresas (id, nombre, zona_horaria, color_primario,
+                              email_notificaciones, activa, creado_en)
+        VALUES (:id, :nombre, :zona, :color, :email, TRUE, NOW())
+    """), {"id": nuevo_id, "nombre": datos.nombre, "zona": datos.zona_horaria,
+           "color": datos.color_primario, "email": datos.email_notificaciones})
+    # Asignar al usuario creador
+    await db.execute(text("""
+        INSERT INTO usuario_empresas (id, usuario_id, empresa_id, activo, fecha_alta, creado_en)
+        VALUES (:id, :uid, :eid, TRUE, CURRENT_DATE, NOW())
+        ON CONFLICT DO NOTHING
+    """), {"id": str(uuid_mod.uuid4()), "uid": str(usuario_actual.id), "eid": nuevo_id})
+    await db.flush()
+    return {"id": nuevo_id, "mensaje": "Empresa creada correctamente"}
+
+
+@router.get("/empresas/{empresa_id}/usuarios")
+async def usuarios_de_empresa(
+    empresa_id: str,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    db: AsyncSession = Depends(get_db)
+):
+    """Lista los usuarios asignados a una empresa."""
+    from app.api.tareas import _obtener_perfiles
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if "administrador" not in perfiles and "dueno" not in perfiles:
+        raise HTTPException(403, "Solo administradores y dueños pueden ver esto")
+    result = await db.execute(text("""
+        SELECT u.id, u.nombre, u.apellido, u.email, u.foto_url, u.activo,
+               ue.fecha_alta, ue.activo AS asignado_activo
+        FROM usuario_empresas ue
+        JOIN usuarios u ON ue.usuario_id = u.id
+        WHERE ue.empresa_id = :eid
+        ORDER BY u.nombre, u.apellido
+    """), {"eid": empresa_id})
+    return [{"id": str(r.id), "nombre": r.nombre, "apellido": r.apellido,
+             "email": r.email, "foto_url": r.foto_url, "activo": r.activo,
+             "fecha_alta": r.fecha_alta.isoformat() if r.fecha_alta else None,
+             "asignado_activo": r.asignado_activo}
+            for r in result.fetchall()]
+
+
+@router.post("/empresas/{empresa_id}/usuarios/{usuario_id}")
+async def asignar_usuario_empresa(
+    empresa_id: str,
+    usuario_id: str,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    db: AsyncSession = Depends(get_db)
+):
+    """Asigna un usuario a una empresa."""
+    from app.api.tareas import _obtener_perfiles
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if "administrador" not in perfiles and "dueno" not in perfiles:
+        raise HTTPException(403, "Solo administradores y dueños pueden asignar usuarios")
+    import uuid as uuid_mod
+    await db.execute(text("""
+        INSERT INTO usuario_empresas (id, usuario_id, empresa_id, activo, fecha_alta, creado_en)
+        VALUES (:id, :uid, :eid, TRUE, CURRENT_DATE, NOW())
+        ON CONFLICT (usuario_id, empresa_id) DO UPDATE
+        SET activo = TRUE, fecha_baja = NULL
+    """), {"id": str(uuid_mod.uuid4()), "uid": usuario_id, "eid": empresa_id})
+    await db.flush()
+    return {"mensaje": "Usuario asignado a la empresa"}
+
+
+@router.delete("/empresas/{empresa_id}/usuarios/{usuario_id}")
+async def quitar_usuario_empresa(
+    empresa_id: str,
+    usuario_id: str,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    db: AsyncSession = Depends(get_db)
+):
+    """Quita un usuario de una empresa (baja lógica)."""
+    from app.api.tareas import _obtener_perfiles
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if "administrador" not in perfiles and "dueno" not in perfiles:
+        raise HTTPException(403, "Solo administradores y dueños pueden quitar usuarios")
+    await db.execute(text("""
+        UPDATE usuario_empresas SET activo = FALSE, fecha_baja = CURRENT_DATE
+        WHERE usuario_id = :uid AND empresa_id = :eid
+    """), {"uid": usuario_id, "eid": empresa_id})
+    await db.flush()
+    return {"mensaje": "Usuario quitado de la empresa"}
 
 
 # =============================================================================
