@@ -19,10 +19,15 @@ import ResumenDia      from "../components/dashboard/ResumenDia.jsx";
 import PanelSupervisor from "../components/dashboard/PanelSupervisor.jsx";
 
 const E = {
-  card:   { background:"#1f2937", borderRadius:"10px", padding:"14px 16px",
-            border:"1px solid #374151" },
-  select: { background:"#111827", border:"1px solid #374151", color:"white",
-            padding:"7px 10px", borderRadius:"6px", fontSize:"13px" },
+  card:    { background:"#1f2937", borderRadius:"10px", padding:"14px 16px",
+             border:"1px solid #374151" },
+  select:  { background:"#111827", border:"1px solid #374151", color:"white",
+             padding:"7px 10px", borderRadius:"6px", fontSize:"13px" },
+  input:   { background:"#111827", border:"1px solid #374151", color:"white",
+             padding:"7px 10px", borderRadius:"6px", fontSize:"13px",
+             colorScheme:"dark" },
+  btnGris: { background:"#374151", color:"white", border:"none", padding:"6px 12px",
+             borderRadius:"6px", cursor:"pointer", fontSize:"12px" },
 };
 
 function fmtFechaLarga(iso) {
@@ -351,13 +356,12 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",
         gap:"10px", marginBottom:"20px" }}>
-        <StatCard label="Actividades"      valor={items.length}          color="gris"    />
-        <StatCard label="Completadas"      valor={completadas}            color="esmeralda"/>
-        <StatCard label="Tiempo trabajado" valor={fmtMinutos(totalMins)}  color="violeta"  />
-        {tiempoSinAct !== null && (
-          <StatCard label="Sin actividad" valor={fmtMinutos(tiempoSinAct)}
-            color={tiempoSinAct > 60 ? "naranja" : "gris"} />
-        )}
+        <StatCard label="Actividades"      valor={items.length}                    color="gris"     />
+        <StatCard label="Completadas"      valor={completadas}                      color="esmeralda"/>
+        <StatCard label="Tiempo trabajado" valor={fmtMinutos(totalMins)}            color="violeta"  />
+        <StatCard label="Sin actividad"
+          valor={fmtMinutos(tiempoSinAct ?? 0)}
+          color={(tiempoSinAct ?? 0) > 60 ? "naranja" : "gris"} />
       </div>
 
       {cargando ? (

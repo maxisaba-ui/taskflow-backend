@@ -49,7 +49,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QListWidget, QListWidgetItem, QDialog,
     QTextEdit, QLineEdit, QSystemTrayIcon, QMenu, QMessageBox,
     QSplashScreen, QFrame, QScrollArea, QButtonGroup, QRadioButton,
-    QFileDialog, QSizePolicy
+    QFileDialog, QSizePolicy, QComboBox
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSettings, QSize, QDate
 from PyQt6.QtWidgets import QDateEdit
@@ -1104,6 +1104,7 @@ class VentanaPrincipal(QMainWindow):
         self.hora_fin_jornada = "18:00"
         self.tareas   = []
         self.workers  = []
+        self._empresas_lista = []
 
         self._configurar_ventana()
         self._construir_ui()
@@ -1183,7 +1184,12 @@ class VentanaPrincipal(QMainWindow):
         self.setMinimumWidth(360)
         self.setMinimumHeight(480)
         self.resize(400, 640)
-        self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.WindowMinimizeButtonHint |
+            Qt.WindowType.WindowCloseButtonHint
+        )
         self.setStyleSheet(f"background-color: {COLORES['fondo']}; color: {COLORES['texto']};")
 
         from PyQt6.QtGui import QGuiApplication
@@ -1218,11 +1224,32 @@ class VentanaPrincipal(QMainWindow):
         self.lbl_usuario.setStyleSheet(f"color: {COLORES['texto_sec']};")
         self.layout_principal.addWidget(self.lbl_usuario)
 
+        # Fila empresa: label + selector (solo cuando tiene más de una)
+        self.row_empresa = QHBoxLayout()
         self.lbl_empresa = QLabel("")
         self.lbl_empresa.setFont(QFont("Segoe UI", 9))
         self.lbl_empresa.setStyleSheet(f"color: {COLORES['acento']}; font-weight: 600;")
         self.lbl_empresa.hide()
-        self.layout_principal.addWidget(self.lbl_empresa)
+        self.row_empresa.addWidget(self.lbl_empresa)
+        self.row_empresa.addStretch()
+
+        self.combo_empresa = QComboBox()
+        self.combo_empresa.setFont(QFont("Segoe UI", 9))
+        self.combo_empresa.setStyleSheet(f"""
+            QComboBox {{
+                background: {COLORES['fondo_card']}; color: {COLORES['texto']};
+                border: 1px solid #4B5563; border-radius: 5px;
+                padding: 3px 8px; min-width: 130px;
+            }}
+            QComboBox QAbstractItemView {{
+                background: {COLORES['fondo_card']}; color: {COLORES['texto']};
+                selection-background-color: #4f46e5;
+            }}
+        """)
+        self.combo_empresa.hide()
+        self.combo_empresa.currentIndexChanged.connect(self._cambiar_empresa_combo)
+        self.row_empresa.addWidget(self.combo_empresa)
+        self.layout_principal.addLayout(self.row_empresa)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -1351,6 +1378,8 @@ class VentanaPrincipal(QMainWindow):
                 self.lbl_empresa.show()
             self.hora_fin_jornada = settings.value("hora_fin", "18:00")
             self.btn_conectar.hide()
+            self._empresas_lista = []
+            self._cargar_empresas()
             self.cargar_tareas()
         else:
             self.lbl_resumen.setText(
@@ -1395,6 +1424,7 @@ class VentanaPrincipal(QMainWindow):
                     self.lbl_empresa.show()
                 self.btn_conectar.hide()
                 self.lbl_resumen.setText("✅ Conectado. Cargando tareas...")
+                self._cargar_empresas()
                 self.cargar_tareas()
             else:
                 QMessageBox.critical(self, "Token inválido",
@@ -1604,6 +1634,80 @@ class VentanaPrincipal(QMainWindow):
             w.error.connect(self._mostrar_error)
             self.workers.append(w)
             w.start()
+
+    def _cargar_empresas(self):
+        """Carga las empresas asignadas al usuario y muestra el selector si tiene más de una."""
+        if not self.token:
+            return
+        self._empresas_lista = []
+        w = ApiWorker("GET", "/auth/mis-empresas", token=self.token)
+        w.resultado.connect(self._mostrar_selector_empresa)
+        w.error.connect(lambda _: None)
+        self.workers.append(w)
+        w.start()
+
+    def _mostrar_selector_empresa(self, data):
+        if not isinstance(data, list):
+            return
+        self._empresas_lista = data
+        self.combo_empresa.blockSignals(True)
+        self.combo_empresa.clear()
+        for emp in data:
+            self.combo_empresa.addItem(f"🏢 {emp.get('nombre','')}", emp.get("id"))
+        self.combo_empresa.blockSignals(False)
+        if len(data) > 1:
+            self.lbl_empresa.hide()
+            self.combo_empresa.show()
+            # Marcar la empresa activa
+            try:
+                import base64, json as _json
+                parts = self.token.split(".")
+                payload_b64 = parts[1] + "==" * (4 - len(parts[1]) % 4)
+                payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+                eid = payload.get("empresa_id")
+                for i, emp in enumerate(data):
+                    if emp.get("id") == eid:
+                        self.combo_empresa.blockSignals(True)
+                        self.combo_empresa.setCurrentIndex(i)
+                        self.combo_empresa.blockSignals(False)
+                        break
+            except Exception:
+                pass
+        elif len(data) == 1:
+            self.lbl_empresa.setText(f"🏢 {data[0].get('nombre','')}")
+            self.lbl_empresa.show()
+            self.combo_empresa.hide()
+
+    def _cambiar_empresa_combo(self, index):
+        """Cambia la empresa activa cuando el usuario selecciona otra en el combo."""
+        if not self._empresas_lista or index < 0 or index >= len(self._empresas_lista):
+            return
+        empresa_id = self._empresas_lista[index].get("id")
+        if not empresa_id:
+            return
+        w = ApiWorker("POST", "/auth/seleccionar-empresa",
+                      datos={"empresa_id": empresa_id}, token=self.token)
+        w.resultado.connect(self._aplicar_cambio_empresa)
+        w.error.connect(self._mostrar_error)
+        self.workers.append(w)
+        w.start()
+
+    def _aplicar_cambio_empresa(self, data):
+        """Aplica el nuevo token recibido al cambiar de empresa."""
+        nuevo_token = data.get("access_token") or data.get("token")
+        if not nuevo_token:
+            return
+        empresa_nombre = data.get("empresa_nombre", "")
+        settings = QSettings("TaskFlowPro", "Widget")
+        settings.setValue("token",   nuevo_token)
+        settings.setValue("empresa", empresa_nombre)
+        self.token = nuevo_token
+        if empresa_nombre:
+            self.lbl_empresa.setText(f"🏢 {empresa_nombre}")
+        self.tray.showMessage("TaskFlow Pro",
+            f"Empresa: {empresa_nombre}",
+            QSystemTrayIcon.MessageIcon.Information, 3000)
+        self.cargar_tareas()
 
     def _abrir_jornada(self):
         """Abre el diálogo Mi Jornada."""
