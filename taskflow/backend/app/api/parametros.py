@@ -26,7 +26,6 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.api.auth import obtener_usuario_actual, obtener_empresa_id
 from app.models.usuario import Usuario
-from app.api.tareas import _obtener_perfiles
 
 router = APIRouter()
 
@@ -132,7 +131,12 @@ async def actualizar_empresa(
     empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
-    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    _p = await db.execute(text("""
+        SELECT p.codigo FROM usuario_perfiles up
+        JOIN perfiles p ON up.perfil_id = p.id
+        WHERE up.usuario_id = :uid AND up.activo = TRUE
+    """), {"uid": str(usuario_actual.id)})
+    perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden editar la empresa")
     campos = {k: v for k, v in datos.dict().items() if v is not None}
@@ -156,7 +160,12 @@ async def listar_empresas(
     db: AsyncSession = Depends(get_db)
 ):
     """Lista todas las empresas. Solo admin/dueño."""
-    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    _p = await db.execute(text("""
+        SELECT p.codigo FROM usuario_perfiles up
+        JOIN perfiles p ON up.perfil_id = p.id
+        WHERE up.usuario_id = :uid AND up.activo = TRUE
+    """), {"uid": str(usuario_actual.id)})
+    perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden ver todas las empresas")
     result = await db.execute(text("""
@@ -184,7 +193,12 @@ async def crear_empresa(
     db: AsyncSession = Depends(get_db)
 ):
     """Crea una nueva empresa y asigna al usuario actual como admin."""
-    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    _p = await db.execute(text("""
+        SELECT p.codigo FROM usuario_perfiles up
+        JOIN perfiles p ON up.perfil_id = p.id
+        WHERE up.usuario_id = :uid AND up.activo = TRUE
+    """), {"uid": str(usuario_actual.id)})
+    perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden crear empresas")
     import uuid as uuid_mod
@@ -212,7 +226,12 @@ async def usuarios_de_empresa(
     db: AsyncSession = Depends(get_db)
 ):
     """Lista los usuarios asignados a una empresa."""
-    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    _p = await db.execute(text("""
+        SELECT p.codigo FROM usuario_perfiles up
+        JOIN perfiles p ON up.perfil_id = p.id
+        WHERE up.usuario_id = :uid AND up.activo = TRUE
+    """), {"uid": str(usuario_actual.id)})
+    perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden ver esto")
     result = await db.execute(text("""
@@ -238,7 +257,12 @@ async def asignar_usuario_empresa(
     db: AsyncSession = Depends(get_db)
 ):
     """Asigna un usuario a una empresa."""
-    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    _p = await db.execute(text("""
+        SELECT p.codigo FROM usuario_perfiles up
+        JOIN perfiles p ON up.perfil_id = p.id
+        WHERE up.usuario_id = :uid AND up.activo = TRUE
+    """), {"uid": str(usuario_actual.id)})
+    perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden asignar usuarios")
     import uuid as uuid_mod
@@ -260,7 +284,12 @@ async def quitar_usuario_empresa(
     db: AsyncSession = Depends(get_db)
 ):
     """Quita un usuario de una empresa (baja lógica)."""
-    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    _p = await db.execute(text("""
+        SELECT p.codigo FROM usuario_perfiles up
+        JOIN perfiles p ON up.perfil_id = p.id
+        WHERE up.usuario_id = :uid AND up.activo = TRUE
+    """), {"uid": str(usuario_actual.id)})
+    perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden quitar usuarios")
     await db.execute(text("""
