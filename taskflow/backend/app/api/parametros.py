@@ -71,8 +71,7 @@ class FeriadoDuplicarAnio(BaseModel):
 class CatalogoTareaCrear(BaseModel):
     """
     DESCRIPCION FUNCIONAL: Esquema para crear o editar tarea del catálogo.
-    v1.1.0: agrega prioridad_default que se usa como prioridad inicial
-    al agregar la tarea al calendario desde sugerencias o agenda.
+    v1.2.0: agrega configuración de email al completar.
     """
     codigo: str
     nombre: str
@@ -81,8 +80,12 @@ class CatalogoTareaCrear(BaseModel):
     duracion_estimada_minutos: Optional[int] = None
     requiere_cliente: bool = True
     es_compleja: bool = False
-    prioridad_default: str = "media"   # urgente | alta | media | baja
+    prioridad_default: str = "media"
     sla_horas_default: Optional[int] = None
+    # Email al completar
+    enviar_email_al_completar: bool = False
+    email_asunto: Optional[str] = None
+    email_cuerpo: Optional[str] = None
 
 
 # =============================================================================
@@ -427,6 +430,8 @@ async def listar_catalogo(
                ct.es_compleja, ct.activo,
                COALESCE(ct.prioridad_default, 'media') AS prioridad_default,
                ct.sla_horas_default,
+               ct.enviar_email_al_completar,
+               ct.email_asunto, ct.email_cuerpo,
                rt.id AS rubro_id,
                rt.nombre AS rubro, rt.color_hex AS rubro_color
         FROM catalogo_tareas ct
@@ -436,19 +441,22 @@ async def listar_catalogo(
     """), params)
     return [
         {
-            "id":                        str(t.id),
-            "codigo":                    t.codigo,
-            "nombre":                    t.nombre,
-            "descripcion":               t.descripcion,
-            "duracion_estimada_minutos": t.duracion_estimada_minutos,
-            "requiere_cliente":          t.requiere_cliente,
-            "es_compleja":               t.es_compleja,
-            "activo":                    t.activo,
-            "prioridad_default":         t.prioridad_default,
-            "sla_horas_default":       t.sla_horas_default,
-            "rubro_id":                  str(t.rubro_id) if t.rubro_id else None,
-            "rubro":                     t.rubro,
-            "rubro_color":               t.rubro_color,
+            "id":                         str(t.id),
+            "codigo":                     t.codigo,
+            "nombre":                     t.nombre,
+            "descripcion":                t.descripcion,
+            "duracion_estimada_minutos":  t.duracion_estimada_minutos,
+            "requiere_cliente":           t.requiere_cliente,
+            "es_compleja":                t.es_compleja,
+            "activo":                     t.activo,
+            "prioridad_default":          t.prioridad_default,
+            "sla_horas_default":          t.sla_horas_default,
+            "enviar_email_al_completar":  t.enviar_email_al_completar or False,
+            "email_asunto":               t.email_asunto,
+            "email_cuerpo":               t.email_cuerpo,
+            "rubro_id":                   str(t.rubro_id) if t.rubro_id else None,
+            "rubro":                      t.rubro,
+            "rubro_color":                t.rubro_color,
         }
         for t in result.fetchall()
     ]
@@ -469,12 +477,14 @@ async def crear_tarea_catalogo(
     result = await db.execute(text("""
         INSERT INTO catalogo_tareas
             (codigo, nombre, descripcion, rubro_id, duracion_estimada_minutos, sla_horas_default,
-             requiere_cliente, es_compleja, prioridad_default, activo,
-             fecha_alta, creado_por)
+             requiere_cliente, es_compleja, prioridad_default,
+             enviar_email_al_completar, email_asunto, email_cuerpo,
+             activo, fecha_alta, creado_por)
         VALUES
             (:codigo, :nombre, :descripcion, :rubro_id, :duracion, :sla_default,
-             :requiere_cliente, :es_compleja, :prioridad_default, TRUE,
-             CURRENT_DATE, :creado_por)
+             :requiere_cliente, :es_compleja, :prioridad_default,
+             :enviar_email, :email_asunto, :email_cuerpo,
+             TRUE, CURRENT_DATE, :creado_por)
         RETURNING id
     """), {
         "codigo":            datos.codigo.upper(),
@@ -486,6 +496,9 @@ async def crear_tarea_catalogo(
         "es_compleja":       datos.es_compleja,
         "prioridad_default": datos.prioridad_default,
         "sla_default":       datos.sla_horas_default,
+        "enviar_email":      datos.enviar_email_al_completar,
+        "email_asunto":      datos.email_asunto,
+        "email_cuerpo":      datos.email_cuerpo,
         "creado_por":        str(usuario_actual.id),
     })
     nuevo_id = result.fetchone()[0]
@@ -522,7 +535,10 @@ async def editar_tarea_catalogo(
             requiere_cliente          = :requiere_cliente,
             es_compleja               = :es_compleja,
             prioridad_default         = :prioridad_default,
-            sla_horas_default         = :sla_default
+            sla_horas_default         = :sla_default,
+            enviar_email_al_completar = :enviar_email,
+            email_asunto              = :email_asunto,
+            email_cuerpo              = :email_cuerpo
         WHERE id = :id
     """), {
         "codigo":            datos.codigo.upper(),
@@ -534,6 +550,9 @@ async def editar_tarea_catalogo(
         "es_compleja":       datos.es_compleja,
         "prioridad_default": datos.prioridad_default,
         "sla_default":       datos.sla_horas_default,
+        "enviar_email":      datos.enviar_email_al_completar,
+        "email_asunto":      datos.email_asunto,
+        "email_cuerpo":      datos.email_cuerpo,
         "id":                tarea_id,
     })
     await db.flush()

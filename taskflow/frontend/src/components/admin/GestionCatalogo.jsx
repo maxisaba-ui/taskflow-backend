@@ -41,10 +41,11 @@ function FormTareaCatalogo({ inicial, rubros, onGuardar, onCancelar, titulo }) {
     duracion_estimada_minutos: inicial?.duracion_estimada_minutos || "",
     requiere_cliente:          inicial?.requiere_cliente !== undefined ? inicial.requiere_cliente : true,
     es_compleja:               inicial?.es_compleja               || false,
-    // prioridad_default: campo del catálogo para herencia al crear tareas
     prioridad_default:         inicial?.prioridad_default         || "media",
-    // sla_horas_default: se convierte a null si vacío para evitar 422
     sla_horas_default:         inicial?.sla_horas_default         || "",
+    enviar_email_al_completar: inicial?.enviar_email_al_completar || false,
+    email_asunto:              inicial?.email_asunto              || "",
+    email_cuerpo:              inicial?.email_cuerpo              || "",
   });
   const [err, setErr] = useState("");
 
@@ -142,13 +143,83 @@ function FormTareaCatalogo({ inicial, rubros, onGuardar, onCancelar, titulo }) {
             placeholder="24" />
         </div>
       </div>
+      {/* ── Sección email al completar ───────────────────────── */}
+      <div style={{ borderTop:"1px solid #374151", marginTop:"14px", paddingTop:"14px" }}>
+        <label style={{ display:"flex", alignItems:"center", gap:"10px",
+          color: f.enviar_email_al_completar ? "#34d399" : "#9ca3af",
+          fontSize:"13px", cursor:"pointer", fontWeight:"600", marginBottom:"10px" }}>
+          <input type="checkbox" checked={f.enviar_email_al_completar}
+            onChange={e => setF({...f, enviar_email_al_completar: e.target.checked})} />
+          📧 Enviar email al cliente al completar esta tarea
+        </label>
+
+        {f.enviar_email_al_completar && (
+          <div style={{ display:"grid", gap:"10px",
+            background:"#111827", borderRadius:"8px", padding:"14px",
+            border:"1px solid #059669" }}>
+            <div>
+              <label style={E.label}>Asunto del email</label>
+              <input style={E.input}
+                value={f.email_asunto}
+                onChange={e => setF({...f, email_asunto: e.target.value})}
+                placeholder="Ej: {{tarea_nombre}} completada — {{empresa_nombre}}" />
+            </div>
+            <div>
+              <label style={E.label}>Cuerpo del email</label>
+              <textarea style={{ ...E.input, height:"160px", resize:"vertical",
+                fontFamily:"monospace", fontSize:"12px" }}
+                value={f.email_cuerpo}
+                onChange={e => setF({...f, email_cuerpo: e.target.value})}
+                placeholder={`Estimado/a {{cliente_nombre}},\n\nLe informamos que la tarea **{{tarea_nombre}}** fue completada el {{fecha_completada}} a las {{hora_completada}}.\n\nTiempo trabajado: {{tiempo_trabajado}}\nResponsable: {{operador_nombre}}\n\nSaludos,\n{{empresa_nombre}}`} />
+            </div>
+            {/* Variables disponibles */}
+            <div style={{ background:"#1f2937", borderRadius:"6px", padding:"10px",
+              border:"1px solid #374151" }}>
+              <div style={{ fontSize:"11px", color:"#6b7280", marginBottom:"6px",
+                fontWeight:"600" }}>
+                Variables disponibles (copiá y pegá en el texto):
+              </div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:"6px" }}>
+                {[
+                  ["{{cliente_nombre}}",   "Nombre del cliente"],
+                  ["{{cliente_email}}",    "Email del cliente"],
+                  ["{{tarea_nombre}}",     "Nombre de la tarea"],
+                  ["{{tarea_codigo}}",     "Código de la tarea"],
+                  ["{{operador_nombre}}", "Quién la completó"],
+                  ["{{empresa_nombre}}",  "Nombre del estudio"],
+                  ["{{fecha_completada}}","Fecha (dd/MM/yyyy)"],
+                  ["{{hora_completada}}", "Hora (HH:MM)"],
+                  ["{{tiempo_trabajado}}","Tiempo trabajado"],
+                ].map(([variable, desc]) => (
+                  <span key={variable}
+                    title={desc}
+                    onClick={() => {
+                      navigator.clipboard?.writeText(variable);
+                    }}
+                    style={{ fontSize:"11px", padding:"2px 6px", borderRadius:"4px",
+                      background:"#064e3b", color:"#6ee7b7",
+                      border:"1px solid #059669", cursor:"copy",
+                      fontFamily:"monospace" }}>
+                    {variable}
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize:"10px", color:"#6b7280", marginTop:"6px" }}>
+                Hacé clic en una variable para copiarla al portapapeles.
+                Usá **texto** para negrita. Requiere SMTP configurado en Mi Empresa.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {err && (
         <div style={{ color:"#fca5a5", background:"#7f1d1d", padding:"7px 12px",
           borderRadius:"6px", fontSize:"12px", marginBottom:"12px" }}>
           ⚠️ {err}
         </div>
       )}
-      <div style={{ display:"flex", gap:"8px" }}>
+      <div style={{ display:"flex", gap:"8px", marginTop:"14px" }}>
         <button style={E.btn} onClick={guardar}>
           {inicial ? "💾 Guardar cambios" : "✅ Agregar tarea"}
         </button>
@@ -595,6 +666,13 @@ export default function GestionCatalogo() {
                             <span style={{ ...E.badge, background:"#3b1d8a",
                               color:"#c4b5fd", border:"1px solid #7c3aed" }}>
                               🔀 compleja
+                            </span>
+                          )}
+                          {t.enviar_email_al_completar && (
+                            <span style={{ ...E.badge, background:"#064e3b",
+                              color:"#6ee7b7", border:"1px solid #059669" }}
+                              title="Envía email al cliente al completar">
+                              📧 email
                             </span>
                           )}
                         </div>

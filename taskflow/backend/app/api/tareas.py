@@ -990,6 +990,21 @@ async def finalizar_tarea(
         campo="estado", valor_anterior="en_curso", valor_nuevo="completada",
         usuario_id=str(usuario_actual.id)
     )
+
+    # Enviar email al cliente si el catálogo lo tiene configurado (async, no bloquea)
+    try:
+        from app.services.email_service import enviar_email_tarea_completada
+        empresa_id_tarea = (await db.execute(sqlt(
+            "SELECT empresa_id::TEXT FROM tareas WHERE id = :id"
+        ), {"id": str(tarea_id)})).scalar()
+        if empresa_id_tarea:
+            import asyncio
+            asyncio.create_task(
+                enviar_email_tarea_completada(db, empresa_id_tarea, str(tarea_id))
+            )
+    except Exception:
+        pass  # El email nunca debe bloquear ni romper la finalización
+
     return {
         "mensaje":                  "Tarea completada",
         "fin":                      ahora.isoformat(),
