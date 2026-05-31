@@ -71,8 +71,8 @@ export default function Layout({ children }) {
     try {
       await cambiarEmpresa(empresaId)
       setMostrarSelector(false)
-      // Recargar la página para que todos los datos se actualicen
-      window.location.reload()
+      // Navegar a "/" para forzar re-render limpio sin perder la sesión
+      window.location.href = "/"
     } catch(e) {
       console.error(e)
     }

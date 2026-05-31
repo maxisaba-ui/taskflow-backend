@@ -372,6 +372,18 @@ async def seleccionar_empresa(
         raise HTTPException(403, "No tenés acceso a esa empresa")
 
     nuevo_token = crear_jwt(str(usuario_actual.id), datos.empresa_id)
+
+    # Crear nueva sesión para el nuevo token (sin esto /auth/me devuelve 401)
+    nuevo_hash = hashlib.sha256(nuevo_token.encode()).hexdigest()
+    nueva_sesion = Sesion(
+        usuario_id=usuario_actual.id,
+        token_hash=nuevo_hash,
+        expira_en=datetime.now(TZ) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        activa=True,
+    )
+    db.add(nueva_sesion)
+    await db.flush()
+
     return {
         "access_token":   nuevo_token,
         "empresa_id":     datos.empresa_id,
