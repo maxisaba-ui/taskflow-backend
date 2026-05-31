@@ -476,6 +476,7 @@ export default function GestionUsuarios() {
                 <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Usuario</th>
                 <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Email</th>
                 <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Perfiles</th>
+                <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Empresas</th>
                 <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Estado</th>
                 <th style={{ padding:"12px 16px" }}></th>
               </tr>
@@ -514,6 +515,30 @@ export default function GestionUsuarios() {
                       })}
                       {(!u.perfiles || u.perfiles.length === 0) && (
                         <span style={{ color:"#6b7280", fontSize:"12px" }}>Sin perfiles</span>
+                      )}
+                    </div>
+                  </td>
+                  {/* Empresas */}
+                  <td style={{ padding:"11px 16px" }}>
+                    <div style={{ display:"flex", gap:"4px", flexWrap:"wrap" }}>
+                      {(u.empresas || []).map(emp => (
+                        <span key={emp.id} title={emp.nombre} style={{
+                          display:"inline-flex", alignItems:"center", gap:"4px",
+                          fontSize:"11px", padding:"2px 7px", borderRadius:"8px",
+                          background: emp.color + "22",
+                          color: emp.color,
+                          border: `1px solid ${emp.color}`,
+                          fontWeight:"600",
+                          maxWidth:"120px", overflow:"hidden",
+                          textOverflow:"ellipsis", whiteSpace:"nowrap",
+                        }}>
+                          <span style={{ width:"6px", height:"6px", borderRadius:"50%",
+                            background: emp.color, flexShrink:0 }} />
+                          {emp.nombre}
+                        </span>
+                      ))}
+                      {(!u.empresas || u.empresas.length === 0) && (
+                        <span style={{ color:"#6b7280", fontSize:"11px" }}>Sin empresa</span>
                       )}
                     </div>
                   </td>

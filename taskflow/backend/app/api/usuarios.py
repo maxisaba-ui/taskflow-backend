@@ -108,17 +108,38 @@ async def listar_usuarios(
         )
         filas = result.scalars().all()
 
+    # Cargar empresas de todos los usuarios en una sola consulta
+    emp_rows = await db.execute(text("""
+        SELECT ue.usuario_id::TEXT, e.id::TEXT AS empresa_id,
+               e.nombre, e.color_primario
+        FROM usuario_empresas ue
+        JOIN empresas e ON ue.empresa_id = e.id
+        WHERE ue.activo = TRUE
+    """))
+    empresas_por_usuario: dict = {}
+    for er in emp_rows.fetchall():
+        uid = str(er.usuario_id)
+        if uid not in empresas_por_usuario:
+            empresas_por_usuario[uid] = []
+        empresas_por_usuario[uid].append({
+            "id": str(er.empresa_id),
+            "nombre": er.nombre,
+            "color": er.color_primario or "#6366f1",
+        })
+
     lista = []
     for u in filas:
-        perfiles = await obtener_perfiles_usuario(db, str(u.id))
+        uid = str(u.id)
+        perfiles = await obtener_perfiles_usuario(db, uid)
         lista.append({
-            "id":       str(u.id),
+            "id":       uid,
             "email":    u.email,
             "nombre":   u.nombre,
             "apellido": u.apellido,
             "foto_url": u.foto_url,
             "activo":   u.activo,
             "perfiles": perfiles,
+            "empresas": empresas_por_usuario.get(uid, []),
         })
     return lista
 

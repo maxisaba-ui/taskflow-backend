@@ -20,7 +20,10 @@ import csv
 import io
 import os
 import socket
+import threading
 import requests
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse, parse_qs
 from datetime import datetime, date
 
 # ── Control de instancia única ────────────────────────────────
@@ -1091,6 +1094,9 @@ class VistaJornada(QDialog):
 # VENTANA PRINCIPAL DEL WIDGET
 # ============================================================
 class VentanaPrincipal(QMainWindow):
+    # Signal para actualizar el token desde el hilo del servidor 9876
+    signal_token_externo = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.token    = None
@@ -1104,10 +1110,73 @@ class VentanaPrincipal(QMainWindow):
         self._configurar_tray()
         self._cargar_sesion_guardada()
 
+        # Signal de token externo (desde servidor 9876) → actualizarla en el hilo UI
+        self.signal_token_externo.connect(self._aplicar_token_externo)
+        self._iniciar_servidor_token()
+
         # Refresh automático cada 2 minutos
         self.timer_refresh = QTimer()
         self.timer_refresh.timeout.connect(self.cargar_tareas)
         self.timer_refresh.start(120_000)
+
+    def _iniciar_servidor_token(self):
+        """Servidor HTTP en puerto 9876 que recibe el nuevo token cuando se cambia de empresa en la web."""
+        ventana_ref = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                token = params.get("t", [None])[0]
+                if token and parsed.path == "/token":
+                    ventana_ref.signal_token_externo.emit(token)
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b"OK")
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+            def log_message(self, *args):
+                pass  # Silenciar logs del servidor
+
+        def run():
+            try:
+                srv = HTTPServer(("127.0.0.1", 9876), Handler)
+                srv.serve_forever()
+            except Exception:
+                pass  # Puerto ocupado o error — no bloquear el widget
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+
+    def _aplicar_token_externo(self, nuevo_token: str):
+        """Aplica el token recibido por el servidor 9876 (cambio de empresa desde la web)."""
+        try:
+            resp = requests.get(
+                f"{API_BASE_URL}/auth/me",
+                headers={"Authorization": f"Bearer {nuevo_token}"},
+                timeout=8
+            )
+            if resp.status_code == 200:
+                datos = resp.json()
+                nombre = f"{datos.get('nombre','')} {datos.get('apellido','')}".strip()
+                empresa = datos.get("empresa_nombre", "")
+                settings = QSettings("TaskFlowPro", "Widget")
+                settings.setValue("token",  nuevo_token)
+                settings.setValue("nombre", nombre)
+                self.token = nuevo_token
+                self.lbl_usuario.setText(f"👤 {nombre}")
+                if empresa:
+                    self.lbl_empresa.setText(f"🏢 {empresa}")
+                    self.lbl_empresa.show()
+                self.btn_conectar.hide()
+                self.tray.showMessage("TaskFlow Pro",
+                    f"Empresa cambiada: {empresa}",
+                    QSystemTrayIcon.MessageIcon.Information, 3000)
+                self.cargar_tareas()
+        except Exception:
+            pass
 
     def _configurar_ventana(self):
         self.setWindowTitle(APP_NAME)
@@ -1148,6 +1217,12 @@ class VentanaPrincipal(QMainWindow):
         self.lbl_usuario.setFont(QFont("Segoe UI", 10))
         self.lbl_usuario.setStyleSheet(f"color: {COLORES['texto_sec']};")
         self.layout_principal.addWidget(self.lbl_usuario)
+
+        self.lbl_empresa = QLabel("")
+        self.lbl_empresa.setFont(QFont("Segoe UI", 9))
+        self.lbl_empresa.setStyleSheet(f"color: {COLORES['acento']}; font-weight: 600;")
+        self.lbl_empresa.hide()
+        self.layout_principal.addWidget(self.lbl_empresa)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -1268,8 +1343,12 @@ class VentanaPrincipal(QMainWindow):
         token = settings.value("token", "")
         if token:
             self.token = token
-            nombre     = settings.value("nombre", "Usuario")
+            nombre  = settings.value("nombre", "Usuario")
+            empresa = settings.value("empresa", "")
             self.lbl_usuario.setText(f"👤 {nombre}")
+            if empresa:
+                self.lbl_empresa.setText(f"🏢 {empresa}")
+                self.lbl_empresa.show()
             self.hora_fin_jornada = settings.value("hora_fin", "18:00")
             self.btn_conectar.hide()
             self.cargar_tareas()
@@ -1303,13 +1382,17 @@ class VentanaPrincipal(QMainWindow):
             )
             if resp.status_code == 200:
                 datos = resp.json()
-                nombre = f"{datos.get('nombre','')} {datos.get('apellido','')}".strip()
-                # Guardar en QSettings para próximas sesiones
+                nombre  = f"{datos.get('nombre','')} {datos.get('apellido','')}".strip()
+                empresa = datos.get("empresa_nombre", "")
                 settings = QSettings("TaskFlowPro", "Widget")
                 settings.setValue("token",  clipboard)
                 settings.setValue("nombre", nombre)
+                settings.setValue("empresa", empresa)
                 self.token = clipboard
                 self.lbl_usuario.setText(f"👤 {nombre}")
+                if empresa:
+                    self.lbl_empresa.setText(f"🏢 {empresa}")
+                    self.lbl_empresa.show()
                 self.btn_conectar.hide()
                 self.lbl_resumen.setText("✅ Conectado. Cargando tareas...")
                 self.cargar_tareas()
