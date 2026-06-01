@@ -93,12 +93,14 @@ class CatalogoTareaCrear(BaseModel):
 
 @router.get("/empresa")
 async def obtener_empresa(
+    empresa_id_override: Optional[str] = Query(default=None),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
-    filtro = "WHERE id = :eid" if empresa_id else "WHERE activa = TRUE LIMIT 1"
-    params = {"eid": empresa_id} if empresa_id else {}
+    eid = empresa_id_override or empresa_id
+    filtro = "WHERE id = :eid" if eid else "WHERE activa = TRUE LIMIT 1"
+    params = {"eid": eid} if eid else {}
     result = await db.execute(text(f"""
         SELECT id, nombre, logo_url, icono_url, zona_horaria,
                horario_inicio_default::TEXT, horario_fin_default::TEXT,
@@ -127,6 +129,7 @@ async def obtener_empresa(
 @router.put("/empresa")
 async def actualizar_empresa(
     datos: EmpresaActualizar,
+    empresa_id_override: Optional[str] = Query(default=None),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
@@ -139,14 +142,15 @@ async def actualizar_empresa(
     perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden editar la empresa")
+    eid = empresa_id_override or empresa_id
     campos = {k: v for k, v in datos.dict().items() if v is not None}
     if not campos:
         return {"mensaje": "Sin cambios"}
     set_clause = ", ".join(f"{k} = :{k}" for k in campos)
-    filtro = "WHERE id = :eid" if empresa_id else "WHERE activa = TRUE"
+    filtro = "WHERE id = :eid" if eid else "WHERE activa = TRUE"
     params = {**campos}
-    if empresa_id:
-        params["eid"] = empresa_id
+    if eid:
+        params["eid"] = eid
     await db.execute(text(f"UPDATE empresas SET {set_clause}, actualizado_en = NOW() {filtro}"), params)
     await db.flush()
     return {"mensaje": "Configuración guardada correctamente"}
@@ -803,7 +807,9 @@ async def _obtener_perfiles_param(usuario_id, db):
 @router.post("/empresa/logo")
 async def subir_logo_empresa(
     archivo: UploadFile = File(...),
+    empresa_id_override: Optional[str] = Query(default=None),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Sube el logo de la empresa a Supabase Storage."""
@@ -822,7 +828,11 @@ async def subir_logo_empresa(
     if len(contenido) > 2 * 1024 * 1024:
         raise HTTPException(400, "El archivo es demasiado grande. Máximo 2MB")
 
-    emp = await db.execute(sqlt("SELECT id FROM empresas WHERE activa = TRUE LIMIT 1"))
+    eid_logo = empresa_id_override or empresa_id
+    if eid_logo:
+        emp = await db.execute(sqlt("SELECT id FROM empresas WHERE id = :id"), {"id": eid_logo})
+    else:
+        emp = await db.execute(sqlt("SELECT id FROM empresas WHERE activa = TRUE LIMIT 1"))
     empresa = emp.fetchone()
     if not empresa:
         raise HTTPException(404, "No hay empresa activa")

@@ -52,7 +52,7 @@ export default function GestionEmpresas() {
     try {
       const [emps, usrs] = await Promise.all([
         api.get("/parametros/empresas"),
-        api.get("/usuarios/"),
+        api.get("/usuarios/?todos=true"),  // todos los usuarios del sistema, no solo los de la empresa activa
       ]);
       setEmpresas(emps || []);
       setUsuarios(usrs || []);

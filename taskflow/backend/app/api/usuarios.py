@@ -84,12 +84,25 @@ async def obtener_perfiles_usuario(db: AsyncSession, usuario_id: str) -> list[st
 @router.get("/")
 async def listar_usuarios(
     activo: bool = True,
+    todos: bool = False,   # si True, admin/dueño puede ver todos los usuarios del sistema
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     empresa_id: str = Depends(obtener_empresa_id),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista usuarios de la empresa activa con sus perfiles."""
-    if empresa_id:
+    """Lista usuarios de la empresa activa con sus perfiles.
+    Con todos=true (admin/dueño), retorna todos los usuarios del sistema."""
+    if todos:
+        from sqlalchemy import text as sqlt
+        _pr = await db.execute(sqlt("""
+            SELECT p.codigo FROM usuario_perfiles up
+            JOIN perfiles p ON up.perfil_id = p.id
+            WHERE up.usuario_id = :uid AND up.activo = TRUE
+        """), {"uid": str(usuario_actual.id)})
+        _codigos = [r.codigo for r in _pr.fetchall()]
+        if "administrador" not in _codigos and "dueno" not in _codigos:
+            todos = False
+
+    if empresa_id and not todos:
         # Solo usuarios asignados a esta empresa
         result = await db.execute(text("""
             SELECT u.id, u.email, u.nombre, u.apellido, u.foto_url, u.activo

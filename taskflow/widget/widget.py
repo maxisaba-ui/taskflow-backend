@@ -1342,9 +1342,16 @@ class VentanaPrincipal(QMainWindow):
 
     def _configurar_tray(self):
         self.tray = QSystemTrayIcon(self)
-        pixmap = QPixmap(32, 32)
-        pixmap.fill(QColor(COLORES["acento"]))
-        self.tray.setIcon(QIcon(pixmap))
+        # Intentar usar icon.ico; fallback al cuadrado de color
+        base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        icon_path  = os.path.join(base_path, "icon.ico")
+        if os.path.exists(icon_path):
+            tray_icon = QIcon(icon_path)
+        else:
+            pixmap = QPixmap(32, 32)
+            pixmap.fill(QColor(COLORES["acento"]))
+            tray_icon = QIcon(pixmap)
+        self.tray.setIcon(tray_icon)
         self.tray.setToolTip("TaskFlow Pro")
 
         menu_tray = QMenu()
@@ -1736,7 +1743,16 @@ def main():
     app.setOrganizationName("TaskFlowPro")
     app.setQuitOnLastWindowClosed(False)
 
+    # Ícono de la aplicación (taskbar + ventana) — resuelve ruta dentro del .exe
+    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    icon_path  = os.path.join(base_path, "icon.ico")
+    if os.path.exists(icon_path):
+        app_icon = QIcon(icon_path)
+        app.setWindowIcon(app_icon)
+
     ventana = VentanaPrincipal()
+    if os.path.exists(icon_path):
+        ventana.setWindowIcon(QIcon(icon_path))
     ventana.show()
 
     sys.exit(app.exec())

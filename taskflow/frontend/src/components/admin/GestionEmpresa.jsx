@@ -1,8 +1,10 @@
 /**
- * GestionEmpresa.jsx — v2.0.0
- * Gestión completa de la empresa activa: datos, logo, color, SMTP.
+ * GestionEmpresa.jsx — v2.1.0
+ * Gestión de empresa: datos, logo, color, SMTP.
+ * Admin/dueño puede elegir cuál empresa editar.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../../context/AuthContext.jsx";
 import { api } from "../../api/client.js";
 
 const E = {
@@ -18,6 +20,8 @@ const E = {
              border:"1px solid #374151", marginBottom:"16px" },
   fila:    { display:"flex", gap:"12px", alignItems:"center", fontSize:"13px" },
   lbl:     { color:"#6b7280", minWidth:"140px" },
+  select:  { background:"#111827", border:"1px solid #374151", color:"white",
+             padding:"8px 10px", borderRadius:"6px", fontSize:"13px", width:"100%" },
 };
 
 function Msg({ msg, onClose }) {
@@ -37,22 +41,41 @@ function Msg({ msg, onClose }) {
 }
 
 export default function GestionEmpresa() {
-  const [datos, setDatos]         = useState(null);
-  const [editando, setEditando]   = useState(false);
-  const [f, setF]                 = useState({});
-  const [msg, setMsg]             = useState({ texto:"", tipo:"" });
-  const [subiendo, setSubiendo]   = useState(false);
-  const [archivoLogo, setLogo]    = useState(null);
-  const [previewLogo, setPreview] = useState(null);
-  const [tabSMTP, setTabSMTP]     = useState(false);
+  const { usuario } = useContext(AuthContext);
+  const esAdmin = usuario?.perfiles?.includes("administrador") ||
+                  usuario?.perfiles?.includes("dueno");
 
-  useEffect(() => { cargar(); }, []);
+  const [empresas, setEmpresas]     = useState([]);       // lista para el selector (admin)
+  const [empresaId, setEmpresaId]   = useState(null);     // null = usa la activa del JWT
+  const [datos, setDatos]           = useState(null);
+  const [editando, setEditando]     = useState(false);
+  const [f, setF]                   = useState({});
+  const [msg, setMsg]               = useState({ texto:"", tipo:"" });
+  const [subiendo, setSubiendo]     = useState(false);
+  const [archivoLogo, setLogo]      = useState(null);
+  const [previewLogo, setPreview]   = useState(null);
+  const [tabSMTP, setTabSMTP]       = useState(false);
+
+  // Cargar lista de empresas para el selector (solo admin/dueño)
+  useEffect(() => {
+    if (esAdmin) {
+      api.get("/parametros/empresas")
+        .then(data => setEmpresas(data || []))
+        .catch(() => {});
+    }
+  }, [esAdmin]);
+
+  // Cargar datos de la empresa seleccionada (o la activa por defecto)
+  useEffect(() => { cargar(); }, [empresaId]);
 
   async function cargar() {
     try {
-      const data = await api.get("/parametros/empresa");
+      const url = empresaId
+        ? `/parametros/empresa?empresa_id_override=${empresaId}`
+        : "/parametros/empresa";
+      const data = await api.get(url);
       setDatos(data); setF(data);
-    } catch(e) { setMsg({ texto:"❌ " + e.message, tipo:"error" }); }
+    } catch(e) { setMsg({ texto:"❌ Error al cargar: " + e.message, tipo:"error" }); }
   }
 
   async function guardar() {
@@ -60,7 +83,10 @@ export default function GestionEmpresa() {
       const payload = { ...f };
       delete payload.id; delete payload.logo_url; delete payload.icono_url; delete payload.activa;
       if (!payload.smtp_password_enc) delete payload.smtp_password_enc;
-      await api.put("/parametros/empresa", payload);
+      const url = empresaId
+        ? `/parametros/empresa?empresa_id_override=${empresaId}`
+        : "/parametros/empresa";
+      await api.put(url, payload);
       setMsg({ texto:"✅ Datos actualizados", tipo:"ok" });
       setEditando(false); cargar();
     } catch(e) { setMsg({ texto:"❌ " + e.message, tipo:"error" }); }
@@ -82,11 +108,15 @@ export default function GestionEmpresa() {
       formData.append("archivo", archivoLogo);
       const token  = localStorage.getItem("taskflow_token");
       const apiUrl = import.meta.env.VITE_API_URL || "/api/v1";
-      const resp   = await fetch(`${apiUrl}/parametros/empresa/logo`, {
+      const eid    = empresaId || datos?.id;
+      const url    = eid
+        ? `${apiUrl}/parametros/empresa/logo?empresa_id_override=${eid}`
+        : `${apiUrl}/parametros/empresa/logo`;
+      const resp = await fetch(url, {
         method:"POST", headers:{ "Authorization":`Bearer ${token}` }, body:formData,
       });
       if (!resp.ok) { const err = await resp.json(); throw new Error(err.detail||"Error"); }
-      setMsg({ texto:"✅ Logo actualizado. Recargá la sesión para verlo en el menú.", tipo:"ok" });
+      setMsg({ texto:"✅ Logo actualizado.", tipo:"ok" });
       setLogo(null); setPreview(null); cargar();
     } catch(e) { setMsg({ texto:"❌ " + e.message, tipo:"error" }); }
     setSubiendo(false);
@@ -96,7 +126,27 @@ export default function GestionEmpresa() {
 
   return (
     <div style={{ color:"white", maxWidth:"640px" }}>
-      <h3 style={{ margin:"0 0 20px", fontSize:"16px" }}>🏢 Configuración de la empresa</h3>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+        marginBottom:"20px" }}>
+        <h3 style={{ margin:0, fontSize:"16px" }}>🏢 Configuración de la empresa</h3>
+        {/* Selector de empresa para admin/dueño */}
+        {esAdmin && empresas.length > 1 && (
+          <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+            <span style={{ fontSize:"12px", color:"#9ca3af" }}>Editando:</span>
+            <select style={{ ...E.select, width:"200px", fontSize:"12px" }}
+              value={empresaId || ""}
+              onChange={e => { setEmpresaId(e.target.value || null); setEditando(false); }}>
+              <option value="">— Mi empresa activa —</option>
+              {empresas.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       <Msg msg={msg} onClose={() => setMsg({ texto:"", tipo:"" })} />
 
       {/* Logo */}
@@ -150,22 +200,21 @@ export default function GestionEmpresa() {
                 ["Zona horaria",  datos.zona_horaria],
                 ["Email notif.",  datos.email_notificaciones || "—"],
                 ["Horario",       `${datos.horario_inicio_default||"—"} → ${datos.horario_fin_default||"—"}`],
-                ["Color primario",null],
               ].map(([label, valor]) => (
                 <div key={label} style={E.fila}>
                   <span style={E.lbl}>{label}:</span>
-                  {label === "Color primario" ? (
-                    <span style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                      <span style={{ width:"18px", height:"18px", borderRadius:"50%",
-                        background: datos.color_primario||"#6366f1",
-                        display:"inline-block", border:"2px solid #374151" }} />
-                      <span style={{ color:"white" }}>{datos.color_primario||"#6366f1"}</span>
-                    </span>
-                  ) : (
-                    <span style={{ color:"white" }}>{valor}</span>
-                  )}
+                  <span style={{ color:"white" }}>{valor}</span>
                 </div>
               ))}
+              <div style={E.fila}>
+                <span style={E.lbl}>Color primario:</span>
+                <span style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                  <span style={{ width:"18px", height:"18px", borderRadius:"50%",
+                    background: datos.color_primario||"#6366f1",
+                    display:"inline-block", border:"2px solid #374151" }} />
+                  <span style={{ color:"white" }}>{datos.color_primario||"#6366f1"}</span>
+                </span>
+              </div>
             </div>
             <button style={{ ...E.btn, marginTop:"14px" }} onClick={() => setEditando(true)}>
               ✏️ Editar datos
@@ -197,18 +246,15 @@ export default function GestionEmpresa() {
                 </div>
               </div>
               <div>
-                <label style={E.label}>Color primario (hex)</label>
+                <label style={E.label}>Color primario</label>
                 <div style={{ display:"flex", gap:"10px", alignItems:"center" }}>
                   <input type="color" value={f.color_primario||"#6366f1"}
                     onChange={e => setF({...f, color_primario:e.target.value})}
-                    style={{ width:"40px", height:"36px", padding:"2px", border:"1px solid #374151",
-                      borderRadius:"6px", cursor:"pointer", background:"#111827" }} />
+                    style={{ width:"40px", height:"36px", padding:"2px",
+                      border:"1px solid #374151", borderRadius:"6px",
+                      cursor:"pointer", background:"#111827" }} />
                   <input style={{ ...E.input, width:"120px" }} value={f.color_primario||"#6366f1"}
-                    onChange={e => setF({...f, color_primario:e.target.value})}
-                    placeholder="#6366f1" />
-                  <span style={{ fontSize:"12px", color:"#6b7280" }}>
-                    Usado en el menú lateral y badges
-                  </span>
+                    onChange={e => setF({...f, color_primario:e.target.value})} />
                 </div>
               </div>
               <div>
@@ -230,7 +276,7 @@ export default function GestionEmpresa() {
       <div style={E.section}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
           marginBottom: tabSMTP ? "12px" : "0" }}>
-          <div style={{ fontSize:"13px", fontWeight:"600" }}>📧 Configuración SMTP</div>
+          <div style={{ fontSize:"13px", fontWeight:"600" }}>📧 SMTP para envío de emails</div>
           <button style={{ ...E.btnGris, padding:"4px 10px", fontSize:"12px" }}
             onClick={() => setTabSMTP(!tabSMTP)}>
             {tabSMTP ? "▲ Ocultar" : "▼ Configurar"}
@@ -238,6 +284,9 @@ export default function GestionEmpresa() {
         </div>
         {tabSMTP && (
           <div style={{ display:"grid", gap:"10px" }}>
+            <div style={{ fontSize:"11px", color:"#6b7280", marginBottom:"4px" }}>
+              Necesario para el envío automático de emails al completar tareas
+            </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 120px", gap:"10px" }}>
               <div>
                 <label style={E.label}>Servidor SMTP</label>
@@ -252,7 +301,7 @@ export default function GestionEmpresa() {
               </div>
             </div>
             <div>
-              <label style={E.label}>Usuario SMTP (email)</label>
+              <label style={E.label}>Usuario SMTP (email remitente)</label>
               <input style={E.input} value={f.smtp_usuario||""}
                 placeholder="notificaciones@miestudio.com"
                 onChange={e => setF({...f, smtp_usuario:e.target.value})} />
