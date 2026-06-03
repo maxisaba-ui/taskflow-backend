@@ -613,6 +613,11 @@ function PanelServiciosCliente({ cliente, onCerrar }) {
 export default function Clientes() {
   const [clientes, setClientes]                 = useState([]);
   const [cargando, setCargando]                 = useState(false);
+  const { usuario } = useContext(AuthContext);
+  const esOperador = usuario?.perfiles?.includes("operador") &&
+    !usuario?.perfiles?.includes("supervisor") &&
+    !usuario?.perfiles?.includes("administrador") &&
+    !usuario?.perfiles?.includes("dueno");
   const [mostrarForm, setMostrarForm]           = useState(false);
   const [clienteEditando, setClienteEditando]   = useState(null);
   const [clienteServicios, setClienteServicios] = useState(null);
@@ -672,13 +677,15 @@ export default function Clientes() {
         {/* Encabezado */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
           <h1 style={{ margin:0, fontSize:"22px" }}>🏢 Clientes</h1>
-          <button style={E.btn} onClick={() => {
-            setMostrarForm(!mostrarForm);
-            setClienteEditando(null); setClienteServicios(null);
-            setMsg({ texto:"", tipo:"" });
-          }}>
-            {mostrarForm ? "✕ Cancelar" : "+ Nuevo cliente"}
-          </button>
+          {!esOperador && (
+            <button style={E.btn} onClick={() => {
+              setMostrarForm(!mostrarForm);
+              setClienteEditando(null); setClienteServicios(null);
+              setMsg({ texto:"", tipo:"" });
+            }}>
+              {mostrarForm ? "✕ Cancelar" : "+ Nuevo cliente"}
+            </button>
+          )}
         </div>
 
         {/* Banner */}
@@ -783,7 +790,7 @@ export default function Clientes() {
                       {/* Acciones */}
                       <td style={{ padding:"11px 16px", textAlign:"right" }}>
                         <div style={{ display:"flex", gap:"5px", justifyContent:"flex-end" }}>
-                          {c.activo && (
+                          {c.activo && !esOperador && (
                             <>
                               <button style={{
                                 ...E.btnAzul,
@@ -803,10 +810,10 @@ export default function Clientes() {
                               </button>
                             </>
                           )}
-                          {c.activo ? (
-                            <button style={E.btnRojo} onClick={() => desactivar(c)}>Desactivar</button>
-                          ) : (
-                            <button style={E.btnVerde} onClick={() => reactivar(c)}>Reactivar</button>
+                          {!esOperador && (
+                            c.activo
+                              ? <button style={E.btnRojo} onClick={() => desactivar(c)}>Desactivar</button>
+                              : <button style={E.btnVerde} onClick={() => reactivar(c)}>Reactivar</button>
                           )}
                         </div>
                       </td>

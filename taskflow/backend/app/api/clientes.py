@@ -42,6 +42,7 @@ import uuid
 
 from app.core.database import get_db
 from app.api.auth import obtener_usuario_actual, obtener_empresa_id
+from app.api.tareas import _obtener_perfiles
 from app.models.usuario import Usuario
 from app.models.cliente import Cliente
 
@@ -288,6 +289,9 @@ async def desactivar_cliente(
     usuario_actual: Usuario = Depends(obtener_usuario_actual)
 ):
     """Baja lógica de un cliente (activo=FALSE)."""
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if not any(p in perfiles for p in ("supervisor", "dueno", "administrador")):
+        raise HTTPException(403, "Solo supervisores o administradores pueden desactivar clientes")
     result = await db.execute(select(Cliente).where(Cliente.id == cliente_id))
     c = result.scalar_one_or_none()
     if not c:
@@ -309,6 +313,9 @@ async def reactivar_cliente(
     usuario_actual: Usuario = Depends(obtener_usuario_actual)
 ):
     """Reactiva un cliente desactivado."""
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if not any(p in perfiles for p in ("supervisor", "dueno", "administrador")):
+        raise HTTPException(403, "Solo supervisores o administradores pueden reactivar clientes")
     result = await db.execute(select(Cliente).where(Cliente.id == cliente_id))
     c = result.scalar_one_or_none()
     if not c:

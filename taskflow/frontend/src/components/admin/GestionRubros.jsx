@@ -161,6 +161,10 @@ function FormRubro({ inicial, onGuardar, onCancelar }) {
 
 export default function GestionRubros() {
   const { usuario } = useContext(AuthContext);
+  const esOperador = usuario?.perfiles?.includes("operador") &&
+    !usuario?.perfiles?.includes("supervisor") &&
+    !usuario?.perfiles?.includes("administrador") &&
+    !usuario?.perfiles?.includes("dueno");
   const [rubros, setRubros]       = useState([]);
   const [mostrarForm, setForm]    = useState(false);
   const [editando, setEditando]   = useState(null);
@@ -234,7 +238,7 @@ export default function GestionRubros() {
         </div>
         <button style={E.btn}
           onClick={() => { setForm(!mostrarForm); setEditando(null); }}>
-          {mostrarForm ? "✕ Cancelar" : "+ Nuevo rubro"}
+          {!esOperador && (mostrarForm ? "✕ Cancelar" : "+ Nuevo rubro")}
         </button>
       </div>
 
