@@ -76,15 +76,68 @@ function exportarCSV(datos, nombre) {
 }
 
 /* =============================================================
+   FilaEtapa — detalle de un paso de tarea compleja
+   ============================================================= */
+function FilaEtapa({ etapa, esSupervisor }) {
+  const cfg     = ESTADO_CONFIG[etapa.estado] || ESTADO_CONFIG.pendiente;
+  const mins    = etapa.tiempo_trabajado_minutos || 0;
+  return (
+    <tr style={{ borderTop:"1px solid #1f2937", background:"#0a0f1a" }}>
+      <td style={{ ...E.td, paddingLeft:"36px", color:"#6b7280", whiteSpace:"nowrap" }}>
+        <span style={{ color:"#374151", marginRight:"6px" }}>└</span>
+        {fmtFecha(null)}
+      </td>
+      <td style={{ ...E.td, color:"#cbd5e1" }}>
+        <span style={{ color:"#475569", marginRight:"4px" }}>#{etapa.orden}</span>
+        {etapa.nombre}
+        {etapa.sla_vencido && (
+          <span style={{ marginLeft:"6px", fontSize:"10px", background:"#450a0a",
+            color:"#fca5a5", padding:"1px 5px", borderRadius:"6px",
+            border:"1px solid #ef4444" }}>
+            ⚠ SLA vencido
+          </span>
+        )}
+        {etapa.vencimiento_sla && (
+          <div style={{ fontSize:"10px", color:"#6b7280", marginTop:"2px" }}>
+            SLA: {fmtFecha(etapa.vencimiento_sla)}
+          </div>
+        )}
+      </td>
+      {esSupervisor && (
+        <td style={{ ...E.td, color:"#6b7280" }}>{etapa.asignado_nombre || "—"}</td>
+      )}
+      <td style={{ ...E.td, color:"#6b7280" }}>—</td>
+      <td style={{ ...E.td, whiteSpace:"nowrap" }}>
+        <span style={{ ...E.badge, background:cfg.bg,
+          color:cfg.color, border:`1px solid ${cfg.border}`, fontSize:"10px" }}>
+          {etapa.estado.replace("_"," ")}
+        </span>
+      </td>
+      <td style={E.td}>—</td>
+      <td style={{ ...E.td, color:"#6b7280", whiteSpace:"nowrap" }}>
+        {fmtTiempo(mins)}
+        {etapa.fin_real && (
+          <div style={{ fontSize:"10px", color:"#4b5563" }}>
+            fin: {fmtFechaHora(etapa.fin_real)}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/* =============================================================
    TabHistorial — espera búsqueda manual
    ============================================================= */
 function TabHistorial({ esSupervisor }) {
   const hoy = new Date().toISOString().split("T")[0];
-  const [tareas, setTareas]         = useState(null); /* null = sin buscar aún */
+  const [tareas, setTareas]         = useState(null);
   const [cargando, setCargando]     = useState(false);
   const [operadores, setOperadores] = useState([]);
   const [clientes, setClientes]     = useState([]);
   const [datosOk, setDatosOk]       = useState(false);
+  const [expandidas, setExpandidas] = useState({});   /* id → bool */
+  const [todasExpandidas, setTodasExp] = useState(false);
 
   const [filtros, setFiltros] = useState({
     fecha_desde: hoy,
@@ -95,7 +148,6 @@ function TabHistorial({ esSupervisor }) {
     prioridad:   "",
   });
 
-  /* Cargar maestros solo cuando el usuario abre el tab por primera vez */
   function cargarMaestros() {
     if (datosOk || !esSupervisor) return;
     Promise.all([
@@ -112,6 +164,8 @@ function TabHistorial({ esSupervisor }) {
     cargarMaestros();
     setCargando(true);
     setTareas(null);
+    setExpandidas({});
+    setTodasExp(false);
     try {
       let url = `/tareas/historial?fecha_desde=${filtros.fecha_desde}&fecha_hasta=${filtros.fecha_hasta}`;
       if (filtros.usuario_id) url += `&usuario_id=${filtros.usuario_id}`;
@@ -119,7 +173,6 @@ function TabHistorial({ esSupervisor }) {
       if (filtros.estado)     url += `&estado=${filtros.estado}`;
       let data = await api.get(url);
       if (!Array.isArray(data)) data = [];
-      /* Filtro de prioridad en cliente (no está en el backend) */
       if (filtros.prioridad) data = data.filter(t => t.prioridad === filtros.prioridad);
       setTareas(data);
     } catch(e) {
@@ -133,11 +186,25 @@ function TabHistorial({ esSupervisor }) {
     setFiltros(prev => ({ ...prev, [campo]: valor }));
   }
 
+  function toggleExpandir(id) {
+    setExpandidas(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function expandirTodas(val, tareasList) {
+    setTodasExp(val);
+    const nuevo = {};
+    (tareasList || []).filter(t => t.es_tarea_compleja).forEach(t => { nuevo[t.id] = val; });
+    setExpandidas(nuevo);
+  }
+
+  const hayComplejas = tareas && tareas.some(t => t.es_tarea_compleja && t.etapas?.length > 0);
+
   const stats = tareas ? {
-    total:       tareas.length,
-    completadas: tareas.filter(t => t.estado === "completada").length,
-    vencidas:    tareas.filter(t => t.estado === "vencida").length,
-    mins:        tareas.reduce((s, t) => s + (t.tiempo_trabajado_minutos || 0), 0),
+    total:          tareas.length,
+    completadas:    tareas.filter(t => t.estado === "completada").length,
+    vencidas:       tareas.filter(t => t.estado === "vencida").length,
+    algVez_vencidas:tareas.filter(t => t.fue_vencida).length,
+    mins:           tareas.reduce((s, t) => s + (t.tiempo_trabajado_minutos || 0), 0),
   } : null;
 
   return (
@@ -207,24 +274,32 @@ function TabHistorial({ esSupervisor }) {
             </select>
           </div>
         </div>
-        <div style={{ display:"flex", gap:"8px", marginTop:"12px", alignItems:"center" }}>
+        <div style={{ display:"flex", gap:"8px", marginTop:"12px", alignItems:"center",
+          flexWrap:"wrap" }}>
           <button style={E.btn} onClick={buscar} disabled={cargando}>
             {cargando ? "⏳ Buscando..." : "🔍 Buscar"}
           </button>
           {tareas && tareas.length > 0 && (
             <button style={E.btnGris} onClick={() => exportarCSV(
               tareas.map(t => ({
-                fecha:      t.fecha_planificada,
-                tarea:      t.tarea_nombre,
-                operador:   t.operador_nombre,
-                cliente:    t.cliente_nombre || "",
-                estado:     t.estado,
-                prioridad:  t.prioridad,
-                tiempo_min: t.tiempo_trabajado_minutos || 0,
+                fecha:        t.fecha_planificada,
+                tarea:        t.tarea_nombre,
+                tipo:         t.es_tarea_compleja ? "compleja" : "simple",
+                operador:     t.operador_nombre,
+                cliente:      t.cliente_nombre || "",
+                estado:       t.estado,
+                fue_vencida:  t.fue_vencida ? "sí" : "no",
+                prioridad:    t.prioridad,
+                tiempo_min:   t.tiempo_trabajado_minutos || 0,
               })),
               `tareas_${filtros.fecha_desde}_${filtros.fecha_hasta}.csv`
             )}>
               ⬇ CSV
+            </button>
+          )}
+          {hayComplejas && (
+            <button style={E.btnGris} onClick={() => expandirTodas(!todasExpandidas, tareas)}>
+              {todasExpandidas ? "⊖ Comprimir todas" : "⊕ Expandir todas"}
             </button>
           )}
           {tareas !== null && (
@@ -235,7 +310,7 @@ function TabHistorial({ esSupervisor }) {
         </div>
       </div>
 
-      {/* Estado inicial — esperando búsqueda */}
+      {/* Estado inicial */}
       {tareas === null && !cargando && (
         <div style={{ textAlign:"center", padding:"60px", color:"#6b7280" }}>
           <div style={{ fontSize:"36px", marginBottom:"12px" }}>🔍</div>
@@ -248,7 +323,6 @@ function TabHistorial({ esSupervisor }) {
         </div>
       )}
 
-      {/* Cargando */}
       {cargando && (
         <div style={{ textAlign:"center", padding:"40px", color:"#6b7280" }}>
           ⏳ Buscando tareas...
@@ -257,13 +331,14 @@ function TabHistorial({ esSupervisor }) {
 
       {/* Resumen rápido */}
       {stats && tareas.length > 0 && (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)",
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px,1fr))",
           gap:"8px", marginBottom:"14px" }}>
           {[
-            { l:"Total",       v:stats.total,       c:"#6366f1" },
-            { l:"Completadas", v:stats.completadas, c:"#16a34a" },
-            { l:"Vencidas",    v:stats.vencidas,    c:"#ef4444" },
-            { l:"Tiempo total",v:fmtTiempo(stats.mins), c:"#7c3aed" },
+            { l:"Total",           v:stats.total,            c:"#6366f1" },
+            { l:"Completadas",     v:stats.completadas,      c:"#16a34a" },
+            { l:"Vencidas hoy",    v:stats.vencidas,         c:"#ef4444" },
+            { l:"Alguna vez venc.",v:stats.algVez_vencidas,  c:"#f97316" },
+            { l:"Tiempo total",    v:fmtTiempo(stats.mins),  c:"#7c3aed" },
           ].map(s => (
             <div key={s.l} style={{ background:"#111827", borderRadius:"6px",
               padding:"8px 10px", border:`1px solid ${s.c}33` }}>
@@ -274,7 +349,6 @@ function TabHistorial({ esSupervisor }) {
         </div>
       )}
 
-      {/* Sin resultados */}
       {tareas !== null && !cargando && tareas.length === 0 && (
         <div style={{ textAlign:"center", padding:"40px", color:"#6b7280", fontSize:"13px" }}>
           Sin resultados para los filtros aplicados
@@ -299,75 +373,106 @@ function TabHistorial({ esSupervisor }) {
             </thead>
             <tbody>
               {tareas.map(t => {
-                const cfg     = ESTADO_CONFIG[t.estado] || ESTADO_CONFIG.pendiente;
-                const colPrio = PRIO_COLOR[t.prioridad] || "#6b7280";
+                const cfg       = ESTADO_CONFIG[t.estado_display || t.estado] || ESTADO_CONFIG.pendiente;
+                const colPrio   = PRIO_COLOR[t.prioridad] || "#6b7280";
+                const expanded  = expandidas[t.id] || false;
+                const tieneEtapas = t.es_tarea_compleja && t.etapas?.length > 0;
                 return (
-                  <tr key={t.id} style={{ borderTop:"1px solid #1f2937" }}>
-                    <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
-                      {fmtFecha(t.fecha_planificada)}
-                    </td>
-                    <td style={{ ...E.td, color:"white", fontWeight:"500" }}>
-                      {t.tarea_nombre}
-                      {t.tarea_codigo && (
-                        <span style={{ color:"#6b7280", fontFamily:"monospace",
-                          fontSize:"10px", marginLeft:"6px" }}>
-                          [{t.tarea_codigo}]
-                        </span>
-                      )}
-                      {t.es_heredada && (
-                        <span style={{ marginLeft:"6px", fontSize:"10px",
-                          background:"#1e1b4b", color:"#a5b4fc",
-                          padding:"1px 5px", borderRadius:"6px",
-                          border:"1px solid #6366f1" }}>
-                          ↩ heredada
-                        </span>
-                      )}
-                      {t.comentario_supervisor && (
-                        <div style={{ fontSize:"11px", color:"#9ca3af", marginTop:"2px" }}>
-                          💬 {t.comentario_supervisor}
-                        </div>
-                      )}
-                    </td>
-                    {esSupervisor && (
+                  <>
+                    <tr key={t.id} style={{ borderTop:"1px solid #1f2937" }}>
                       <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
-                        {t.operador_nombre || "—"}
+                        {fmtFecha(t.fecha_planificada)}
                       </td>
-                    )}
-                    <td style={{ ...E.td, color:"#9ca3af" }}>
-                      {t.cliente_nombre || "—"}
-                      {t.servicio_nombre && (
-                        <div style={{ fontSize:"10px", color:"#6b7280" }}>
-                          🔧 {t.servicio_nombre}
+                      <td style={{ ...E.td, color:"white", fontWeight:"500" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:"6px", flexWrap:"wrap" }}>
+                          {tieneEtapas && (
+                            <button onClick={() => toggleExpandir(t.id)}
+                              style={{ background:"none", border:"none", cursor:"pointer",
+                                color:"#6366f1", fontSize:"14px", padding:"0", lineHeight:1 }}>
+                              {expanded ? "▼" : "▶"}
+                            </button>
+                          )}
+                          <span>{t.tarea_nombre}</span>
+                          {t.tarea_codigo && (
+                            <span style={{ color:"#6b7280", fontFamily:"monospace",
+                              fontSize:"10px" }}>
+                              [{t.tarea_codigo}]
+                            </span>
+                          )}
+                          {t.es_tarea_compleja && (
+                            <span style={{ fontSize:"10px", background:"#1e1b4b",
+                              color:"#a5b4fc", padding:"1px 5px", borderRadius:"6px",
+                              border:"1px solid #6366f1" }}>
+                              🔀 compleja
+                            </span>
+                          )}
+                          {t.es_heredada && (
+                            <span style={{ fontSize:"10px", background:"#1e1b4b",
+                              color:"#a5b4fc", padding:"1px 5px", borderRadius:"6px",
+                              border:"1px solid #6366f1" }}>
+                              ↩ heredada
+                            </span>
+                          )}
+                          {t.fue_vencida && (
+                            <span style={{ fontSize:"10px", background:"#431407",
+                              color:"#fb923c", padding:"1px 5px", borderRadius:"6px",
+                              border:"1px solid #ea580c" }}>
+                              ⚠ fue vencida
+                            </span>
+                          )}
                         </div>
+                        {t.comentario_supervisor && (
+                          <div style={{ fontSize:"11px", color:"#9ca3af", marginTop:"2px",
+                            paddingLeft: tieneEtapas ? "20px" : "0" }}>
+                            💬 {t.comentario_supervisor}
+                          </div>
+                        )}
+                      </td>
+                      {esSupervisor && (
+                        <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
+                          {t.operador_nombre || "—"}
+                        </td>
                       )}
-                    </td>
-                    <td style={{ ...E.td, whiteSpace:"nowrap" }}>
-                      <span style={{ ...E.badge, background:cfg.bg,
-                        color:cfg.color, border:`1px solid ${cfg.border}` }}>
-                        {t.estado.replace("_"," ")}
-                      </span>
-                    </td>
-                    <td style={E.td}>
-                      <span style={{ ...E.badge, background:colPrio+"22",
-                        color:colPrio, border:`1px solid ${colPrio}` }}>
-                        {t.prioridad}
-                      </span>
-                    </td>
-                    <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
-                      {(() => {
-                        let mins = t.tiempo_trabajado_minutos || 0;
-                        if (t.estado === "en_curso" && t.inicio_real) {
-                          mins += Math.floor((Date.now() - new Date(t.inicio_real)) / 60000);
-                        }
-                        const s = fmtTiempo(mins);
-                        return t.estado === "en_curso"
-                          ? <span style={{ color:"#10b981" }}>{s} ▶</span>
-                          : t.estado === "pausada"
-                          ? <span style={{ color:"#f59e0b" }}>{s} ⏸</span>
-                          : s;
-                      })()}
-                    </td>
-                  </tr>
+                      <td style={{ ...E.td, color:"#9ca3af" }}>
+                        {t.cliente_nombre || "—"}
+                        {t.servicio_nombre && (
+                          <div style={{ fontSize:"10px", color:"#6b7280" }}>
+                            🔧 {t.servicio_nombre}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ ...E.td, whiteSpace:"nowrap" }}>
+                        <span style={{ ...E.badge, background:cfg.bg,
+                          color:cfg.color, border:`1px solid ${cfg.border}` }}>
+                          {(t.estado_display || t.estado).replace("_"," ")}
+                        </span>
+                      </td>
+                      <td style={E.td}>
+                        <span style={{ ...E.badge, background:colPrio+"22",
+                          color:colPrio, border:`1px solid ${colPrio}` }}>
+                          {t.prioridad}
+                        </span>
+                      </td>
+                      <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
+                        {(() => {
+                          let mins = t.tiempo_trabajado_minutos || 0;
+                          if (t.estado === "en_curso" && t.inicio_real) {
+                            mins += Math.floor((Date.now() - new Date(t.inicio_real)) / 60000);
+                          }
+                          const s = fmtTiempo(mins);
+                          return t.estado === "en_curso"
+                            ? <span style={{ color:"#10b981" }}>{s} ▶</span>
+                            : t.estado === "pausada"
+                            ? <span style={{ color:"#f59e0b" }}>{s} ⏸</span>
+                            : s;
+                        })()}
+                      </td>
+                    </tr>
+                    {/* Filas de etapas expandidas */}
+                    {tieneEtapas && expanded && t.etapas.map(e => (
+                      <FilaEtapa key={e.id || e.orden} etapa={e} esSupervisor={esSupervisor} />
+                    ))}
+                  </>
                 );
               })}
             </tbody>

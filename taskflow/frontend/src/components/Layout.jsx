@@ -41,6 +41,7 @@ const MENU = [
   { path:"/agenda",               icono:"📅", label:"Agenda",            requierePerfil: ["supervisor","dueno","administrador","operador"] },
   { path:"/seguimiento-complejo", icono:"🔀", label:"Tareas complejas",  requierePerfil: null },
   { path:"/seguimiento",          icono:"🔍", label:"Seguimiento",       requierePerfil: null },
+  { path:"/registro-trabajo",     icono:"📒", label:"Registro de Trabajo",requierePerfil: null },
   { path:"/reportes",             icono:"📊", label:"Reportes",          requierePerfil: null },
   { path:"/clientes",             icono:"👥", label:"Clientes",          requierePerfil: null },
   { path:"/administracion",       icono:"⚙️", label:"Administración",    requierePerfil: ["administrador","dueno"] },

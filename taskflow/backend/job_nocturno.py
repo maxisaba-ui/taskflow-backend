@@ -47,7 +47,7 @@ async def ejecutar_mantenimiento():
         print("\n[2/4] Marcando tareas vencidas...")
         vencidas = await conn.execute("""
             UPDATE tareas
-            SET estado = 'vencida', actualizado_en = NOW()
+            SET estado = 'vencida', fue_vencida = TRUE, actualizado_en = NOW()
             WHERE estado IN ('pendiente', 'pausada')
               AND fecha_vencimiento < $1
               AND activa = TRUE

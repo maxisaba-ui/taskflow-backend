@@ -14,6 +14,7 @@ import Seguimiento         from "./pages/Seguimiento.jsx"
 import Agenda              from "./pages/Agenda.jsx"
 import Administracion      from "./pages/Administracion.jsx"
 import SeguimientoComplejo from "./pages/SeguimientoComplejo.jsx"
+import RegistroTrabajo     from "./pages/RegistroTrabajo.jsx"
 import Layout              from "./components/Layout.jsx"
 
 function RutaProtegida({ children }) {
@@ -55,6 +56,9 @@ export default function App() {
         } />
         <Route path="/seguimiento-complejo" element={
           <RutaProtegida><Layout><SeguimientoComplejo /></Layout></RutaProtegida>
+        } />
+        <Route path="/registro-trabajo" element={
+          <RutaProtegida><Layout><RegistroTrabajo /></Layout></RutaProtegida>
         } />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

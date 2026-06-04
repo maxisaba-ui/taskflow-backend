@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select, func, and_
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime, timedelta
 import pytz
 import io
@@ -354,6 +354,147 @@ async def reporte_comparativo(
             for r in rows
         ]
     }
+
+
+@router.get("/registro-trabajo")
+async def registro_trabajo(
+    anio:         int           = Query(...),
+    mes:          int           = Query(..., ge=1, le=12),
+    cliente_ids:  Optional[str] = Query(default=None, description="IDs separados por coma"),
+    catalogo_ids: Optional[str] = Query(default=None, description="IDs separados por coma"),
+    usuario_actual: Usuario     = Depends(obtener_usuario_actual),
+    db: AsyncSession             = Depends(get_db)
+):
+    """
+    Retorna todas las tareas ejecutadas en el mes indicado para la empresa
+    del usuario autenticado. Opcionalmente filtra por cliente(s) y/o tarea(s)
+    del catálogo. Para tareas complejas incluye el detalle de sus etapas.
+    """
+    from app.api.auth import obtener_empresa_id as _emp_dep
+    from app.api.tareas import _obtener_perfiles
+
+    empresa_id = (await db.execute(text(
+        "SELECT empresa_id::TEXT FROM sesiones WHERE activa=TRUE AND usuario_id=:uid ORDER BY creado_en DESC LIMIT 1"
+    ), {"uid": str(usuario_actual.id)})).scalar()
+
+    filtros = [
+        "t.activa = TRUE",
+        "EXTRACT(YEAR  FROM t.fecha_planificada) = :anio",
+        "EXTRACT(MONTH FROM t.fecha_planificada) = :mes",
+    ]
+    params: dict = {"anio": anio, "mes": mes}
+
+    if empresa_id:
+        filtros.append("t.empresa_id = :eid")
+        params["eid"] = empresa_id
+
+    if cliente_ids:
+        ids = [i.strip() for i in cliente_ids.split(",") if i.strip()]
+        if ids:
+            filtros.append("t.cliente_id = ANY(:cids)")
+            params["cids"] = ids
+
+    if catalogo_ids:
+        ids = [i.strip() for i in catalogo_ids.split(",") if i.strip()]
+        if ids:
+            filtros.append("t.catalogo_tarea_id = ANY(:ctids)")
+            params["ctids"] = ids
+
+    where = " AND ".join(filtros)
+
+    result = await db.execute(text(f"""
+        SELECT
+            t.id,
+            t.fecha_planificada,
+            t.fecha_vencimiento,
+            t.estado,
+            t.prioridad,
+            t.tiempo_trabajado_minutos,
+            t.fin_real,
+            t.es_tarea_compleja,
+            t.seguimiento_complejo_id,
+            t.catalogo_tarea_id,
+            COALESCE(t.fue_vencida, FALSE)
+                OR (t.fin_real IS NOT NULL AND t.fecha_vencimiento IS NOT NULL
+                    AND t.fin_real::date > t.fecha_vencimiento) AS fue_vencida,
+            COALESCE(ct.nombre, t.nombre_personalizado, 'Sin nombre') AS tarea_nombre,
+            COALESCE(ct.codigo, '')  AS tarea_codigo,
+            u.nombre || ' ' || u.apellido AS operador_nombre,
+            c.razon_social  AS cliente_nombre,
+            c.id::TEXT      AS cliente_id,
+            s.nombre        AS servicio_nombre
+        FROM tareas t
+        JOIN  usuarios u      ON t.asignado_a_id    = u.id
+        LEFT JOIN catalogo_tareas ct ON t.catalogo_tarea_id = ct.id
+        LEFT JOIN clientes    c  ON t.cliente_id    = c.id
+        LEFT JOIN servicios   s  ON t.servicio_id   = s.id
+        WHERE {where}
+        ORDER BY c.razon_social NULLS LAST, t.fecha_planificada, ct.nombre NULLS LAST
+        LIMIT 1000
+    """), params)
+    rows = result.fetchall()
+
+    # Etapas para tareas complejas
+    ids_complejas = [str(r.id) for r in rows if r.es_tarea_compleja and r.seguimiento_complejo_id]
+    etapas_por_tarea: dict = {}
+    if ids_complejas:
+        ejec_r = await db.execute(text("""
+            SELECT
+                t.id::TEXT AS tarea_id,
+                e.orden,
+                e.nombre,
+                e.estado,
+                e.fin_real,
+                e.tiempo_trabajado_minutos,
+                e.vencimiento_sla,
+                COALESCE(e.sla_vencido, FALSE) AS sla_vencido
+            FROM tareas t
+            JOIN tarea_compleja_etapas e ON e.ejecucion_id = t.seguimiento_complejo_id
+            WHERE t.id = ANY(:ids) AND e.activo = TRUE
+            ORDER BY t.id, e.orden
+        """), {"ids": ids_complejas})
+        for e in ejec_r.fetchall():
+            etapas_por_tarea.setdefault(e.tarea_id, []).append({
+                "orden":                    e.orden,
+                "nombre":                   e.nombre,
+                "estado":                   e.estado,
+                "fin_real":                 e.fin_real.isoformat() if e.fin_real else None,
+                "tiempo_trabajado_minutos": e.tiempo_trabajado_minutos,
+                "vencimiento_sla":          e.vencimiento_sla.isoformat() if e.vencimiento_sla else None,
+                "sla_vencido":              e.sla_vencido,
+            })
+
+    tareas = []
+    for r in rows:
+        tid = str(r.id)
+        etapas = etapas_por_tarea.get(tid, [])
+        if r.es_tarea_compleja and etapas:
+            tiempo_total = sum(e["tiempo_trabajado_minutos"] or 0 for e in etapas)
+            fue_vencida  = r.fue_vencida or any(e["sla_vencido"] for e in etapas)
+        else:
+            tiempo_total = r.tiempo_trabajado_minutos
+            fue_vencida  = bool(r.fue_vencida)
+
+        tareas.append({
+            "id":                       tid,
+            "tarea_nombre":             r.tarea_nombre,
+            "tarea_codigo":             r.tarea_codigo,
+            "catalogo_tarea_id":        str(r.catalogo_tarea_id) if r.catalogo_tarea_id else None,
+            "cliente_id":               r.cliente_id,
+            "cliente_nombre":           r.cliente_nombre or "Sin cliente",
+            "servicio_nombre":          r.servicio_nombre,
+            "operador_nombre":          r.operador_nombre,
+            "fecha_planificada":        r.fecha_planificada.isoformat() if r.fecha_planificada else None,
+            "fecha_vencimiento":        r.fecha_vencimiento.isoformat() if r.fecha_vencimiento else None,
+            "estado":                   r.estado,
+            "prioridad":                r.prioridad,
+            "fue_vencida":              fue_vencida,
+            "es_tarea_compleja":        bool(r.es_tarea_compleja),
+            "tiempo_trabajado_minutos": tiempo_total,
+            "etapas":                   etapas,
+        })
+
+    return {"anio": anio, "mes": mes, "total": len(tareas), "tareas": tareas}
 
 
 def _calcular_brecha_maxima(tareas) -> int:

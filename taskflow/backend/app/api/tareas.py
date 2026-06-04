@@ -678,6 +678,7 @@ async def historial_tareas(
         SELECT
             t.id,
             t.fecha_planificada,
+            t.fecha_vencimiento,
             t.estado,
             t.prioridad,
             t.tiempo_trabajado_minutos,
@@ -690,6 +691,9 @@ async def historial_tareas(
             t.asignado_a_id,
             t.cliente_id,
             t.servicio_id,
+            t.es_tarea_compleja,
+            t.seguimiento_complejo_id,
+            COALESCE(t.fue_vencida, FALSE) AS fue_vencida,
             COALESCE(ct.nombre, t.nombre_personalizado, 'Sin nombre') AS tarea_nombre,
             COALESCE(ct.codigo, '')                                   AS tarea_codigo,
             u.nombre  || ' ' || u.apellido  AS operador_nombre,
@@ -705,16 +709,81 @@ async def historial_tareas(
         LIMIT 500
     """), params)
 
-    return [
-        {
-            "id":                       str(r.id),
+    rows = result.fetchall()
+
+    # Para tareas complejas, traer etapas en una sola consulta
+    ids_complejas = [str(r.id) for r in rows if r.es_tarea_compleja and r.seguimiento_complejo_id]
+    etapas_por_tarea: dict = {}
+    if ids_complejas:
+        ejec_result = await db.execute(sqlt("""
+            SELECT
+                t.id::TEXT AS tarea_id,
+                e.id::TEXT AS etapa_id,
+                e.orden,
+                e.nombre,
+                e.estado,
+                e.inicio_real,
+                e.fin_real,
+                e.tiempo_trabajado_minutos,
+                e.vencimiento_sla,
+                COALESCE(e.sla_vencido, FALSE) AS sla_vencido,
+                e.comentario_operador,
+                u.nombre || ' ' || u.apellido AS asignado_nombre
+            FROM tareas t
+            JOIN tarea_compleja_etapas e ON e.ejecucion_id = t.seguimiento_complejo_id
+            LEFT JOIN usuarios u ON e.asignado_a_id = u.id
+            WHERE t.id = ANY(:ids) AND e.activo = TRUE
+            ORDER BY t.id, e.orden
+        """), {"ids": ids_complejas})
+        for e in ejec_result.fetchall():
+            etapas_por_tarea.setdefault(e.tarea_id, []).append({
+                "id":                       e.etapa_id,
+                "orden":                    e.orden,
+                "nombre":                   e.nombre,
+                "estado":                   e.estado,
+                "inicio_real":              e.inicio_real.isoformat() if e.inicio_real else None,
+                "fin_real":                 e.fin_real.isoformat()    if e.fin_real    else None,
+                "tiempo_trabajado_minutos": e.tiempo_trabajado_minutos,
+                "vencimiento_sla":          e.vencimiento_sla.isoformat() if e.vencimiento_sla else None,
+                "sla_vencido":              e.sla_vencido,
+                "comentario_operador":      e.comentario_operador,
+                "asignado_nombre":          e.asignado_nombre,
+            })
+
+    tareas = []
+    for r in rows:
+        tid = str(r.id)
+        etapas = etapas_por_tarea.get(tid, [])
+        # Para tareas complejas: tiempo = suma etapas; estado_display = etapa activa
+        if r.es_tarea_compleja and etapas:
+            tiempo_total = sum(e["tiempo_trabajado_minutos"] or 0 for e in etapas)
+            etapa_activa = next(
+                (e for e in etapas if e["estado"] in ("en_curso", "pausada")),
+                None
+            )
+            estado_display = etapa_activa["estado"] if etapa_activa else r.estado
+            fue_vencida_calc = r.fue_vencida or any(e["sla_vencido"] for e in etapas)
+        else:
+            tiempo_total   = r.tiempo_trabajado_minutos
+            estado_display = r.estado
+            fue_vencida_calc = r.fue_vencida or (
+                r.fin_real and r.fecha_vencimiento and
+                r.fin_real.date() > r.fecha_vencimiento
+            )
+
+        tareas.append({
+            "id":                       tid,
             "tarea_nombre":             r.tarea_nombre,
             "tarea_codigo":             r.tarea_codigo,
             "estado":                   r.estado,
+            "estado_display":           estado_display,
             "prioridad":                r.prioridad,
             "fecha_planificada":        r.fecha_planificada.isoformat() if r.fecha_planificada else None,
-            "tiempo_trabajado_minutos": r.tiempo_trabajado_minutos,
+            "fecha_vencimiento":        r.fecha_vencimiento.isoformat() if r.fecha_vencimiento else None,
+            "tiempo_trabajado_minutos": tiempo_total,
             "es_heredada":              r.es_heredada,
+            "es_tarea_compleja":        r.es_tarea_compleja or False,
+            "fue_vencida":              bool(fue_vencida_calc),
             "tipo_creacion":            r.tipo_creacion,
             "comentario_supervisor":    r.comentario_supervisor,
             "comentario_operador":      r.comentario_operador,
@@ -726,9 +795,10 @@ async def historial_tareas(
             "cliente_nombre":           r.cliente_nombre,
             "servicio_id":              str(r.servicio_id)   if r.servicio_id   else None,
             "servicio_nombre":          r.servicio_nombre,
-        }
-        for r in result.fetchall()
-    ]
+            "etapas":                   etapas,
+        })
+
+    return tareas
 
 
 
