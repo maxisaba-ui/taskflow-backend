@@ -15,7 +15,12 @@ async function request(metodo, endpoint, body = null) {
   const opciones = { method: metodo, headers };
   if (body) opciones.body = JSON.stringify(body);
 
-  const resp = await fetch(`${BASE_URL}${endpoint}`, opciones);
+  let resp;
+  try {
+    resp = await fetch(`${BASE_URL}${endpoint}`, opciones);
+  } catch (netErr) {
+    throw new Error(`No se pudo conectar al servidor (${netErr.message})`);
+  }
 
   if (resp.status === 401) {
     // Token expirado — redirigir al login
@@ -25,7 +30,7 @@ async function request(metodo, endpoint, body = null) {
   }
 
   if (!resp.ok) {
-    const error = await resp.json().catch(() => ({ detail: "Error desconocido" }));
+    const error = await resp.json().catch(() => ({ detail: `Error ${resp.status}` }));
     throw new Error(error.detail || `Error ${resp.status}`);
   }
 

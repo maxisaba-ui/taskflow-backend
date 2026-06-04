@@ -260,7 +260,7 @@ async def asignar_usuario_empresa(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
-    """Asigna un usuario a una empresa."""
+    """Asigna un usuario a una empresa (upsert explícito)."""
     _p = await db.execute(text("""
         SELECT p.codigo FROM usuario_perfiles up
         JOIN perfiles p ON up.perfil_id = p.id
@@ -269,13 +269,26 @@ async def asignar_usuario_empresa(
     perfiles = [r.codigo for r in _p.fetchall()]
     if "administrador" not in perfiles and "dueno" not in perfiles:
         raise HTTPException(403, "Solo administradores y dueños pueden asignar usuarios")
+
     import uuid as uuid_mod
-    await db.execute(text("""
-        INSERT INTO usuario_empresas (id, usuario_id, empresa_id, activo, fecha_alta, creado_en)
-        VALUES (:id, :uid, :eid, TRUE, CURRENT_DATE, NOW())
-        ON CONFLICT (usuario_id, empresa_id) DO UPDATE
-        SET activo = TRUE, fecha_baja = NULL
-    """), {"id": str(uuid_mod.uuid4()), "uid": usuario_id, "eid": empresa_id})
+    existe = await db.execute(text("""
+        SELECT id FROM usuario_empresas
+        WHERE usuario_id = :uid AND empresa_id = :eid
+    """), {"uid": usuario_id, "eid": empresa_id})
+    fila = existe.fetchone()
+
+    if fila:
+        await db.execute(text("""
+            UPDATE usuario_empresas
+            SET activo = TRUE, fecha_baja = NULL
+            WHERE usuario_id = :uid AND empresa_id = :eid
+        """), {"uid": usuario_id, "eid": empresa_id})
+    else:
+        await db.execute(text("""
+            INSERT INTO usuario_empresas (id, usuario_id, empresa_id, activo, fecha_alta, creado_en)
+            VALUES (:id, :uid::uuid, :eid::uuid, TRUE, CURRENT_DATE, NOW())
+        """), {"id": str(uuid_mod.uuid4()), "uid": usuario_id, "eid": empresa_id})
+
     await db.flush()
     return {"mensaje": "Usuario asignado a la empresa"}
 
