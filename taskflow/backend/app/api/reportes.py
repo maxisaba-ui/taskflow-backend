@@ -12,7 +12,7 @@ import io
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.api.auth import obtener_usuario_actual
+from app.api.auth import obtener_usuario_actual, obtener_empresa_id
 from app.models.usuario import Usuario
 
 router = APIRouter()
@@ -363,6 +363,7 @@ async def registro_trabajo(
     cliente_ids:  Optional[str] = Query(default=None, description="IDs separados por coma"),
     catalogo_ids: Optional[str] = Query(default=None, description="IDs separados por coma"),
     usuario_actual: Usuario     = Depends(obtener_usuario_actual),
+    empresa_id:     str         = Depends(obtener_empresa_id),
     db: AsyncSession             = Depends(get_db)
 ):
     """
@@ -370,13 +371,6 @@ async def registro_trabajo(
     del usuario autenticado. Opcionalmente filtra por cliente(s) y/o tarea(s)
     del catálogo. Para tareas complejas incluye el detalle de sus etapas.
     """
-    from app.api.auth import obtener_empresa_id as _emp_dep
-    from app.api.tareas import _obtener_perfiles
-
-    empresa_id = (await db.execute(text(
-        "SELECT empresa_id::TEXT FROM sesiones WHERE activa=TRUE AND usuario_id=:uid ORDER BY creado_en DESC LIMIT 1"
-    ), {"uid": str(usuario_actual.id)})).scalar()
-
     filtros = [
         "t.activa = TRUE",
         "EXTRACT(YEAR  FROM t.fecha_planificada) = :anio",

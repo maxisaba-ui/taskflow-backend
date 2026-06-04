@@ -78,14 +78,24 @@ function exportarCSV(datos, nombre) {
 /* =============================================================
    FilaEtapa — detalle de un paso de tarea compleja
    ============================================================= */
-function FilaEtapa({ etapa, esSupervisor }) {
-  const cfg     = ESTADO_CONFIG[etapa.estado] || ESTADO_CONFIG.pendiente;
-  const mins    = etapa.tiempo_trabajado_minutos || 0;
+function FilaEtapa({ etapa, esSupervisor, prioridad }) {
+  const cfg      = ESTADO_CONFIG[etapa.estado] || ESTADO_CONFIG.pendiente;
+  const colPrio  = PRIO_COLOR[prioridad] || "#6b7280";
+
+  // Tiempo: en_curso suma el delta desde inicio_real hasta ahora
+  let mins = etapa.tiempo_trabajado_minutos || 0;
+  if (etapa.estado === "en_curso" && etapa.inicio_real) {
+    mins += Math.floor((Date.now() - new Date(etapa.inicio_real)) / 60000);
+  }
+
+  // Fecha a mostrar: fin para completada, inicio para en_curso, SLA para vencida
+  const fechaDisplay = etapa.fin_real || etapa.inicio_real;
+
   return (
     <tr style={{ borderTop:"1px solid #1f2937", background:"#0a0f1a" }}>
       <td style={{ ...E.td, paddingLeft:"36px", color:"#6b7280", whiteSpace:"nowrap" }}>
         <span style={{ color:"#374151", marginRight:"6px" }}>└</span>
-        {fmtFecha(null)}
+        {fmtFecha(fechaDisplay)}
       </td>
       <td style={{ ...E.td, color:"#cbd5e1" }}>
         <span style={{ color:"#475569", marginRight:"4px" }}>#{etapa.orden}</span>
@@ -102,6 +112,11 @@ function FilaEtapa({ etapa, esSupervisor }) {
             SLA: {fmtFecha(etapa.vencimiento_sla)}
           </div>
         )}
+        {etapa.comentario_operador && (
+          <div style={{ fontSize:"10px", color:"#6b7280", marginTop:"2px" }}>
+            💬 {etapa.comentario_operador}
+          </div>
+        )}
       </td>
       {esSupervisor && (
         <td style={{ ...E.td, color:"#6b7280" }}>{etapa.asignado_nombre || "—"}</td>
@@ -113,9 +128,20 @@ function FilaEtapa({ etapa, esSupervisor }) {
           {etapa.estado.replace("_"," ")}
         </span>
       </td>
-      <td style={E.td}>—</td>
-      <td style={{ ...E.td, color:"#6b7280", whiteSpace:"nowrap" }}>
-        {fmtTiempo(mins)}
+      <td style={E.td}>
+        {prioridad && (
+          <span style={{ ...E.badge, background:colPrio+"22",
+            color:colPrio, border:`1px solid ${colPrio}` }}>
+            {prioridad}
+          </span>
+        )}
+      </td>
+      <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
+        {etapa.estado === "en_curso"
+          ? <span style={{ color:"#10b981" }}>{fmtTiempo(mins)} ▶</span>
+          : etapa.estado === "pausada"
+          ? <span style={{ color:"#f59e0b" }}>{fmtTiempo(mins)} ⏸</span>
+          : fmtTiempo(mins)}
         {etapa.fin_real && (
           <div style={{ fontSize:"10px", color:"#4b5563" }}>
             fin: {fmtFechaHora(etapa.fin_real)}
@@ -470,7 +496,7 @@ function TabHistorial({ esSupervisor }) {
                     </tr>
                     {/* Filas de etapas expandidas */}
                     {tieneEtapas && expanded && t.etapas.map(e => (
-                      <FilaEtapa key={e.id || e.orden} etapa={e} esSupervisor={esSupervisor} />
+                      <FilaEtapa key={e.id || e.orden} etapa={e} esSupervisor={esSupervisor} prioridad={t.prioridad} />
                     ))}
                   </>
                 );

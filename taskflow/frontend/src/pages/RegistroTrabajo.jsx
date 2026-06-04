@@ -43,6 +43,21 @@ function fmtTiempo(m) {
   if (m < 60) return `${m}m`;
   return `${Math.floor(m/60)}h${m%60 ? ` ${m%60}m` : ""}`;
 }
+function calcTiempo(item) {
+  let mins = item.tiempo_trabajado_minutos || 0;
+  if (item.estado === "en_curso" && item.inicio_real) {
+    mins += Math.floor((Date.now() - new Date(item.inicio_real)) / 60000);
+  }
+  return mins;
+}
+function CeldaTiempo({ item }) {
+  const mins = calcTiempo(item);
+  if (item.estado === "en_curso")
+    return <span style={{ color:"#10b981" }}>{fmtTiempo(mins)} ▶</span>;
+  if (item.estado === "pausada")
+    return <span style={{ color:"#f59e0b" }}>{fmtTiempo(mins)} ⏸</span>;
+  return <span>{fmtTiempo(mins)}</span>;
+}
 function exportarCSV(datos, nombre) {
   if (!datos.length) return;
   const cols   = Object.keys(datos[0]);
@@ -293,8 +308,8 @@ function TablaPorCliente({ tareas, mostrarVencida, mostrarSLA, esSupervisor }) {
                       {mostrarVencida && (
                         <td style={E.td}>{t.fue_vencida ? <BadgeVencida /> : <span style={{ color:"#374151" }}>—</span>}</td>
                       )}
-                      <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
-                        {fmtTiempo(t.tiempo_trabajado_minutos)}
+                      <td style={{ ...E.td, whiteSpace:"nowrap" }}>
+                        <CeldaTiempo item={t} />
                       </td>
                     </tr>
                     {tieneEtapas && exp && (t.etapas||[]).map((e, ei) => (
@@ -330,8 +345,8 @@ function TablaPorCliente({ tareas, mostrarVencida, mostrarSLA, esSupervisor }) {
                               : <span style={{ color:"#1f2937" }}>—</span>}
                           </td>
                         )}
-                        <td style={{ ...E.td, color:"#4b5563", whiteSpace:"nowrap" }}>
-                          {fmtTiempo(e.tiempo_trabajado_minutos)}
+                        <td style={{ ...E.td, whiteSpace:"nowrap" }}>
+                          <CeldaTiempo item={e} />
                         </td>
                       </tr>
                     ))}
@@ -432,8 +447,8 @@ function GrupoTarea({ grupo, mostrarVencida, mostrarSLA, esSupervisor }) {
                     {t.fue_vencida ? <BadgeVencida /> : <span style={{ color:"#374151" }}>—</span>}
                   </td>
                 )}
-                <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap" }}>
-                  {fmtTiempo(t.tiempo_trabajado_minutos)}
+                <td style={{ ...E.td, whiteSpace:"nowrap" }}>
+                  <CeldaTiempo item={t} />
                 </td>
               </tr>
             ) : (
@@ -462,11 +477,9 @@ function GrupoTarea({ grupo, mostrarVencida, mostrarSLA, esSupervisor }) {
                             </div>
                           )}
                           <EstadoBadge estado={e.estado} />
-                          {e.tiempo_trabajado_minutos > 0 && (
-                            <div style={{ color:"#6b7280", fontSize:"11px" }}>
-                              ⏱ {fmtTiempo(e.tiempo_trabajado_minutos)}
-                            </div>
-                          )}
+                          <div style={{ fontSize:"11px", marginTop:"2px" }}>
+                            ⏱ <CeldaTiempo item={e} />
+                          </div>
                           {mostrarSLA && e.vencimiento_sla && (
                             <div style={{ color:"#4b5563", fontSize:"10px" }}>
                               SLA: {fmtFecha(e.vencimiento_sla)}
@@ -485,8 +498,8 @@ function GrupoTarea({ grupo, mostrarVencida, mostrarSLA, esSupervisor }) {
                     </td>
                   );
                 })}
-                <td style={{ ...E.td, color:"#9ca3af", whiteSpace:"nowrap", fontWeight:"500" }}>
-                  {fmtTiempo(t.tiempo_trabajado_minutos)}
+                <td style={{ ...E.td, whiteSpace:"nowrap", fontWeight:"500" }}>
+                  <CeldaTiempo item={t} />
                 </td>
               </tr>
             ))}
@@ -573,28 +586,46 @@ export default function RegistroTrabajo() {
   const [mes,   setMes]   = useState(hoy.getMonth() + 1);
   const [modo,  setModo]  = useState("por_cliente");
 
-  const [clientes,     setClientes]    = useState([]);
-  const [catalogo,     setCatalogo]    = useState([]);
-  const [clienteSel,   setClienteSel]  = useState([]);
-  const [catalogoSel,  setCatalogoSel] = useState([]);
+  const [clientes,        setClientes]       = useState([]);
+  const [catalogoRaw,     setCatalogoRaw]    = useState([]);  // items completos con rubro_id
+  const [rubros,          setRubros]         = useState([]);
+  const [clienteSel,      setClienteSel]     = useState([]);
+  const [catalogoSel,     setCatalogoSel]    = useState([]);
+  const [rubroSel,        setRubroSel]       = useState("");  // "" = todos
 
   const [mostrarVencida, setMostrarVencida] = useState(true);
   const [mostrarSLA,     setMostrarSLA]     = useState(false);
 
   const [tareas,   setTareas]   = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [maestros, setMaestros] = useState(false);
+
+  /* Catálogo filtrado por rubro */
+  const catalogoFiltrado = rubroSel
+    ? catalogoRaw.filter(c => c.rubro_id === rubroSel)
+    : catalogoRaw;
+
+  /* Cuando cambia el rubro, limpiar selección de tareas que ya no aplican */
+  useEffect(() => {
+    if (!rubroSel) return;
+    const idsValidos = new Set(catalogoFiltrado.map(c => c.id));
+    setCatalogoSel(prev => prev.filter(id => idsValidos.has(id)));
+  }, [rubroSel]);
 
   /* Cargar maestros una vez */
   useEffect(() => {
     Promise.all([
       api.get("/clientes/?activo=true"),
       api.get("/parametros/catalogo?activo=true"),
-    ]).then(([cl, cat]) => {
+      api.get("/parametros/rubros"),
+    ]).then(([cl, cat, rb]) => {
       setClientes((cl||[]).map(c => ({ id:c.id, label:c.razon_social })));
-      setCatalogo((cat||[]).map(c => ({ id:c.id, label:`${c.codigo ? `[${c.codigo}] ` : ""}${c.nombre}` })));
-      setMaestros(true);
-    }).catch(() => setMaestros(true));
+      setCatalogoRaw((cat||[]).map(c => ({
+        id:       c.id,
+        rubro_id: c.rubro_id || null,
+        label:    `${c.codigo ? `[${c.codigo}] ` : ""}${c.nombre}`,
+      })));
+      setRubros((rb||[]).map(r => ({ id:r.id, label:r.nombre })));
+    }).catch(() => {});
   }, []);
 
   /* Navegación de mes */
@@ -677,7 +708,7 @@ export default function RegistroTrabajo() {
 
         {/* Filtros */}
         <div style={{ display:"grid", gap:"10px",
-          gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))",
+          gridTemplateColumns:"repeat(auto-fill, minmax(210px, 1fr))",
           marginBottom:"12px" }}>
           <div>
             <div style={{ fontSize:"11px", color:"#9ca3af", marginBottom:"3px" }}>
@@ -692,10 +723,26 @@ export default function RegistroTrabajo() {
           </div>
           <div>
             <div style={{ fontSize:"11px", color:"#9ca3af", marginBottom:"3px" }}>
-              Tareas del catálogo {catalogoSel.length > 0 ? `(${catalogoSel.length})` : "(todas)"}
+              Rubro
+            </div>
+            <select
+              value={rubroSel}
+              onChange={e => setRubroSel(e.target.value)}
+              style={{ background:"#111827", border:"1px solid #374151", color:"white",
+                padding:"7px 10px", borderRadius:"6px", fontSize:"13px", width:"100%" }}>
+              <option value="">Todos los rubros</option>
+              {rubros.map(r => (
+                <option key={r.id} value={r.id}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize:"11px", color:"#9ca3af", marginBottom:"3px" }}>
+              Tareas {rubroSel ? `del rubro · ${catalogoFiltrado.length} disponibles` : "(todas)"}
+              {catalogoSel.length > 0 && ` · ${catalogoSel.length} selec.`}
             </div>
             <MultiSelect
-              opciones={catalogo}
+              opciones={catalogoFiltrado}
               seleccionados={catalogoSel}
               onChange={setCatalogoSel}
               placeholder="Todas las tareas"
