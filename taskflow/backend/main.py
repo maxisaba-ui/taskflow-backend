@@ -1,7 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="TaskFlow Pro",
@@ -41,6 +45,20 @@ app.include_router(seguimiento.router,        prefix="/api/v1/seguimiento",     
 app.include_router(reportes.router,           prefix="/api/v1/reportes",         tags=["reportes"])
 app.include_router(parametros.router,         prefix="/api/v1/parametros",       tags=["parametros"])
 app.include_router(notificaciones.router,     prefix="/api/v1/notificaciones",   tags=["notificaciones"])
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """
+    Captura excepciones no manejadas y devuelve un JSON 500 que
+    pasa por CORSMiddleware, garantizando que el header
+    Access-Control-Allow-Origin esté presente en respuestas de error.
+    """
+    logger.error("Unhandled exception: %s %s → %r", request.method, request.url, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor"},
+    )
+
 
 @app.on_event("startup")
 async def startup():
