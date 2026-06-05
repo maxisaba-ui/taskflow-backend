@@ -219,6 +219,19 @@ export default function Layout({ children }) {
           )
         })}
 
+        {/* Manual de usuario */}
+        <a href="/manual.html" target="_blank" rel="noopener noreferrer" style={{
+          color:"#9ca3af", textDecoration:"none", padding:"10px 12px",
+          borderRadius:"8px", background:"transparent", fontSize:"14px",
+          display:"flex", alignItems:"center", gap:"8px", marginTop:"8px",
+          border:"1px solid #374151", transition:"background 0.15s",
+        }}
+          onMouseEnter={e => e.currentTarget.style.background="#1f2937"}
+          onMouseLeave={e => e.currentTarget.style.background="transparent"}
+        >
+          📖 Manual de usuario
+        </a>
+
         {/* Footer del menu: usuario y logout */}
         <div style={{ marginTop:"auto", paddingTop:"20px", borderTop:"1px solid #374151" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>

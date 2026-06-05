@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow Pro — Manual de Usuario</title>
+<style>
+:root{
+  --bg:#0f172a;--bg2:#1e293b;--bg3:#334155;
+  --accent:#6366f1;--accent2:#818cf8;
+  --text:#f1f5f9;--muted:#94a3b8;--border:#334155;
+  --green:#10b981;--yellow:#f59e0b;--red:#ef4444;
+  --orange:#f97316;--blue:#3b82f6;--purple:#a855f7;
+  --sw:268px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.65}
+
+/* ── SIDEBAR ── */
+#sb{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;z-index:100;padding-bottom:40px}
+#sb::-webkit-scrollbar{width:3px}
+#sb::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb-logo{padding:18px 20px 14px;border-bottom:1px solid var(--border);margin-bottom:6px}
+.sb-logo h2{font-size:15px;color:var(--accent2);font-weight:700}
+.sb-logo p{font-size:11px;color:var(--muted);margin-top:2px}
+.sb-sec{padding:12px 18px 4px;font-size:10px;font-weight:800;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.sb-link{display:block;padding:6px 20px;font-size:13px;color:var(--muted);text-decoration:none;border-left:2px solid transparent;transition:all .12s}
+.sb-link:hover,.sb-link.active{color:var(--text);background:rgba(99,102,241,.1);border-left-color:var(--accent)}
+.sb-link span{margin-right:7px}
+
+/* ── MAIN ── */
+#main{margin-left:var(--sw);padding:0 52px 100px;max-width:980px}
+.section{padding-top:72px}
+.sec-hdr{border-bottom:2px solid var(--accent);padding-bottom:10px;margin-bottom:30px}
+.sec-hdr h2{font-size:28px;font-weight:700;display:flex;align-items:center;gap:10px}
+.sec-hdr .sub{font-size:13px;color:var(--muted);margin-top:5px}
+h3{font-size:18px;font-weight:600;margin:32px 0 12px;color:var(--accent2)}
+h4{font-size:14px;font-weight:700;margin:20px 0 8px;color:var(--text)}
+p{font-size:14px;color:#cbd5e1;margin-bottom:12px}
+ul,ol{font-size:14px;color:#cbd5e1;padding-left:22px;margin-bottom:12px}
+li{margin-bottom:5px}
+strong{color:var(--text)}
+code{background:#1e293b;border:1px solid #334155;padding:1px 6px;border-radius:4px;font-size:12px;font-family:monospace;color:#a5b4fc}
+
+/* ── BOXES ── */
+.box{border-radius:8px;padding:14px 18px;margin:14px 0;font-size:13px}
+.box-info{background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.3)}
+.box-tip{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3)}
+.box-warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3)}
+.box-danger{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3)}
+.box-icon{font-size:15px;margin-right:6px}
+
+/* ── BADGES ── */
+.bdg{display:inline-flex;align-items:center;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap}
+.bdg-pend{background:#1e3a5f;color:#93c5fd;border:1px solid #2563eb}
+.bdg-curso{background:#064e3b;color:#6ee7b7;border:1px solid #059669}
+.bdg-pausa{background:#78350f;color:#fde68a;border:1px solid #d97706}
+.bdg-comp{background:#1a2e1a;color:#86efac;border:1px solid #16a34a}
+.bdg-venc{background:#450a0a;color:#fca5a5;border:1px solid #ef4444}
+.bdg-val{background:#2d1b69;color:#c4b5fd;border:1px solid #7c3aed}
+.bdg-urg{background:#450a0a;color:#fca5a5;border:1px solid #ef4444}
+.bdg-alta{background:#431407;color:#fb923c;border:1px solid #ea580c}
+.bdg-media{background:#422006;color:#fde68a;border:1px solid #ca8a04}
+.bdg-baja{background:#052e16;color:#86efac;border:1px solid #16a34a}
+
+/* ── TABLA ── */
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+th{background:#1f2937;padding:9px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+td{padding:10px 14px;border-bottom:1px solid var(--border);color:#cbd5e1;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+/* ── SCREEN MOCK ── */
+.mock{background:#111827;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:18px 0;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.mock-bar{background:#1f2937;padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.mock-body{padding:16px 20px}
+.mock-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;margin-bottom:6px;background:#1f2937;font-size:12px}
+.mock-stat{background:#111827;border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center;flex:1}
+.mock-stat .n{font-size:22px;font-weight:700}
+.mock-stat .l{font-size:10px;color:var(--muted);margin-top:2px}
+.mock-stats{display:flex;gap:8px;margin-bottom:10px}
+
+/* ── ROLE CARDS ── */
+.role-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px;margin:16px 0}
+.role-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px}
+.role-card .rname{font-weight:700;font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.role-card li{font-size:12px;color:var(--muted);margin-bottom:4px}
+
+/* ── STEP FLOW ── */
+.steps{display:flex;align-items:center;gap:0;margin:20px 0;flex-wrap:wrap;row-gap:12px}
+.step{flex:1;min-width:100px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 10px;text-align:center;font-size:12px}
+.step .sn{width:22px;height:22px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin:0 auto 7px}
+.sarrow{font-size:20px;color:var(--muted);padding:0 4px;align-self:center}
+
+/* ── WIDGET ── */
+.widget-wrap{display:flex;gap:20px;align-items:flex-start;margin:16px 0;flex-wrap:wrap}
+.widget{background:#12122b;border:2px solid var(--accent);border-radius:12px;padding:16px;width:260px;font-size:12px;box-shadow:0 8px 32px rgba(99,102,241,.25);flex-shrink:0}
+.widget .wt{font-weight:700;font-size:13px;color:var(--accent2);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.widget .wtask{background:#1f2937;border-radius:6px;padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.widget .wbtn{background:var(--accent);color:white;border:none;padding:5px 12px;border-radius:5px;font-size:11px;cursor:pointer;margin-right:4px}
+
+/* ── SYNC DIAGRAM ── */
+.sync-diag{display:flex;align-items:center;justify-content:center;gap:0;margin:20px 0;flex-wrap:wrap;row-gap:16px}
+.sync-box{background:var(--bg2);border:2px solid var(--border);border-radius:10px;padding:16px;min-width:160px;text-align:center;font-size:13px}
+.sync-box.active{border-color:var(--accent)}
+.sync-box .sb-icon{font-size:28px;margin-bottom:6px}
+.sync-box .sb-label{font-size:12px;color:var(--muted);margin-top:4px}
+.sync-arrow{display:flex;flex-direction:column;align-items:center;padding:0 12px;color:var(--muted);font-size:11px}
+.sync-arrow .arrow-line{width:50px;height:2px;background:var(--accent);position:relative;margin:8px 0}
+.sync-arrow .arrow-line::after{content:'▶';position:absolute;right:-10px;top:-9px;color:var(--accent);font-size:14px}
+.sync-arrow .arrow-line::before{content:'◀';position:absolute;left:-10px;top:-9px;color:var(--accent);font-size:14px}
+
+/* ── FLOWCHART ── */
+.fc-wrap{background:#080d14;border:1px solid var(--border);border-radius:12px;padding:20px;margin:24px 0;overflow-x:auto}
+.fc-wrap svg{display:block;margin:0 auto}
+
+/* ── GLOSARIO ── */
+.gloss-item{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.gloss-item:last-child{border-bottom:none}
+.gloss-term{font-weight:700;font-size:14px;color:var(--accent2);margin-bottom:4px}
+.gloss-def{font-size:13px;color:#cbd5e1}
+
+/* ── HERO ── */
+.hero{background:linear-gradient(135deg,#1e1b4b,#1e3a5f,#1a2e1a);border:1px solid var(--border);border-radius:12px;padding:36px;margin:40px 0 24px;text-align:center}
+.hero h1{font-size:36px;font-weight:800;margin-bottom:10px;background:linear-gradient(90deg,#818cf8,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--muted);font-size:15px}
+.hero .version{font-size:12px;color:var(--muted);margin-top:10px}
+
+@media print{
+  #sb{display:none}
+  #main{margin-left:0;padding:0 24px}
+  .section{page-break-inside:avoid}
+  .hero{print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<nav id="sb">
+  <div class="sb-logo">
+    <h2>📋 TaskFlow Pro</h2>
+    <p>Manual de Usuario v1.0</p>
+  </div>
+  <div class="sb-sec">Introducción</div>
+  <a class="sb-link" href="#intro"><span>📖</span>¿Qué es TaskFlow Pro?</a>
+  <a class="sb-link" href="#roles"><span>👥</span>Roles y permisos</a>
+  <a class="sb-link" href="#flujo"><span>🔄</span>Flujograma del proceso</a>
+  <div class="sb-sec">Acceso al sistema</div>
+  <a class="sb-link" href="#login"><span>🔑</span>Inicio de sesión</a>
+  <a class="sb-link" href="#empresa"><span>🏢</span>Selección de empresa</a>
+  <div class="sb-sec">Módulos principales</div>
+  <a class="sb-link" href="#dashboard"><span>🏠</span>Dashboard</a>
+  <a class="sb-link" href="#agenda"><span>📅</span>Agenda</a>
+  <a class="sb-link" href="#tareas"><span>✅</span>Tareas simples</a>
+  <a class="sb-link" href="#complejas"><span>🔀</span>Tareas complejas</a>
+  <a class="sb-link" href="#seguimiento"><span>🔍</span>Seguimiento</a>
+  <a class="sb-link" href="#registro"><span>📒</span>Registro de Trabajo</a>
+  <a class="sb-link" href="#reportes"><span>📊</span>Reportes</a>
+  <a class="sb-link" href="#clientes"><span>👥</span>Clientes</a>
+  <div class="sb-sec">Administración</div>
+  <a class="sb-link" href="#admin"><span>⚙️</span>Gestión administrativa</a>
+  <div class="sb-sec">Widget Desktop</div>
+  <a class="sb-link" href="#widget"><span>🖥️</span>Widget Windows</a>
+  <a class="sb-link" href="#convivencia"><span>🔗</span>Browser + Widget</a>
+  <div class="sb-sec">Referencia</div>
+  <a class="sb-link" href="#glosario"><span>📖</span>Glosario</a>
+</nav>
+
+<!-- ═══════════════ CONTENIDO ═══════════════ -->
+<div id="main">
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <h1>TaskFlow Pro</h1>
+  <p>Sistema de gestión de tareas para estudios contables</p>
+  <div class="version">Manual de Usuario · Versión 1.0 · Junio 2026</div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 1: INTRODUCCIÓN                 -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="intro">
+  <div class="sec-hdr">
+    <h2><span>📖</span> ¿Qué es TaskFlow Pro?</h2>
+    <div class="sub">Visión general del sistema</div>
+  </div>
+
+  <p><strong>TaskFlow Pro</strong> es un sistema de gestión de tareas diseñado específicamente para estudios contables. Permite controlar en tiempo real el trabajo de cada operador, que supervisores asignen tareas con plazos y prioridades, y que los dueños accedan a métricas completas del estudio.</p>
+
+  <div class="box box-info">
+    <span class="box-icon">💡</span>El sistema funciona en dos superficies que se sincronizan automáticamente: el <strong>browser</strong> (aplicación web accesible desde cualquier computadora) y el <strong>widget desktop</strong> (aplicación instalada en Windows que permite control rápido sin abrir el browser).
+  </div>
+
+  <h3>Componentes del sistema</h3>
+  <table>
+    <tr><th>Componente</th><th>Qué es</th><th>Para quién</th></tr>
+    <tr><td><strong>🌐 Aplicación web</strong></td><td>Acceso completo desde el browser (Chrome, Edge, Firefox). URL del estudio.</td><td>Todos los usuarios</td></tr>
+    <tr><td><strong>🖥️ Widget desktop</strong></td><td>App pequeña en Windows que vive en la barra de tareas. Control rápido sin abrir el browser.</td><td>Principalmente operadores</td></tr>
+    <tr><td><strong>🔔 Notificaciones</strong></td><td>Alertas en tiempo real de tareas por vencer, heredadas, o pendientes de validación.</td><td>Todos los usuarios</td></tr>
+  </table>
+
+  <h3>Capacidades principales</h3>
+  <ul>
+    <li>⏱️ <strong>Control de tiempo real</strong> — cada tarea registra cuándo se inició, cuándo se pausó, y el tiempo neto trabajado</li>
+    <li>📋 <strong>Asignación de tareas</strong> — supervisores crean y asignan tareas con fecha, prioridad y SLA</li>
+    <li>🔀 <strong>Tareas complejas</strong> — flujos de trabajo multi-etapa con validaciones entre pasos</li>
+    <li>📅 <strong>Herencia automática</strong> — tareas incompletas al cierre del día pasan automáticamente al próximo día hábil</li>
+    <li>📊 <strong>Métricas y reportes</strong> — tiempos por operador, por cliente, por rubro; exportables a CSV</li>
+    <li>🏢 <strong>Multi-empresa</strong> — un mismo usuario puede pertenecer a múltiples estudios</li>
+  </ul>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 2: ROLES Y PERMISOS             -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="roles">
+  <div class="sec-hdr">
+    <h2><span>👥</span> Roles y Permisos</h2>
+    <div class="sub">Qué puede hacer cada tipo de usuario</div>
+  </div>
+
+  <p>TaskFlow Pro tiene cuatro roles. Cada usuario puede tener uno o más roles asignados. Los permisos son <strong>acumulativos</strong>: un supervisor tiene todo lo del operador, más lo suyo propio.</p>
+
+  <div class="role-grid">
+    <div class="role-card">
+      <div class="rname" style="color:#93c5fd">🔵 Operador</div>
+      <ul>
+        <li>Ver sus propias tareas del día</li>
+        <li>Iniciar / pausar / reanudar / completar tareas asignadas</li>
+        <li>Agregar comentarios a sus tareas</li>
+        <li>Ver su historial personal</li>
+        <li>Usar el widget desktop</li>
+      </ul>
+    </div>
+    <div class="role-card">
+      <div class="rname" style="color:#fde68a">🟡 Supervisor</div>
+      <ul>
+        <li>Todo lo del operador</li>
+        <li>Crear y asignar tareas a operadores</li>
+        <li>Ver tareas de todo el equipo</li>
+        <li>Validar etapas de tareas complejas</li>
+        <li>Ver la Agenda completa del equipo</li>
+        <li>Acceder al historial de todos</li>
+        <li>Crear rubros y catálogo de tareas</li>
+      </ul>
+    </div>
+    <div class="role-card">
+      <div class="rname" style="color:#86efac">🟢 Dueño</div>
+      <ul>
+        <li>Todo lo del supervisor</li>
+        <li>Reportes y métricas completos</li>
+        <li>Registro de Trabajo (consulta mensual)</li>
+        <li>Gestión de usuarios y empresas</li>
+        <li>Log de auditoría</li>
+        <li>Gestión de clientes</li>
+      </ul>
+    </div>
+    <div class="role-card">
+      <div class="rname" style="color:#c4b5fd">🟣 Administrador</div>
+      <ul>
+        <li>Todo lo del dueño</li>
+        <li>Gestión técnica de empresas</li>
+        <li>Configuración de parámetros del sistema</li>
+        <li>Acceso a todas las empresas</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Resumen de acceso por módulo</h3>
+  <table>
+    <tr><th>Módulo</th><th>Operador</th><th>Supervisor</th><th>Dueño/Admin</th></tr>
+    <tr><td>Dashboard</td><td>Solo sus tareas</td><td>Todo el equipo</td><td>Todo el estudio</td></tr>
+    <tr><td>Agenda</td><td>Sus tareas del mes</td><td>Todo el equipo</td><td>Todo el equipo</td></tr>
+    <tr><td>Tareas Complejas</td><td>Ver sus etapas</td><td>Crear + validar</td><td>Crear + validar</td></tr>
+    <tr><td>Seguimiento</td><td>Solo su historial</td><td>Historial del equipo</td><td>Historial + Auditoría</td></tr>
+    <tr><td>Registro de Trabajo</td><td>✓</td><td>✓</td><td>✓</td></tr>
+    <tr><td>Reportes</td><td>✓</td><td>✓</td><td>✓ completo</td></tr>
+    <tr><td>Clientes</td><td>Solo lectura</td><td>Solo lectura</td><td>ABM completo</td></tr>
+    <tr><td>Administración</td><td>—</td><td>—</td><td>✓ completo</td></tr>
+  </table>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 3: FLUJOGRAMA                   -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="flujo">
+  <div class="sec-hdr">
+    <h2><span>🔄</span> Flujograma del Proceso</h2>
+    <div class="sub">Cómo avanza el trabajo en el sistema</div>
+  </div>
+
+  <p>El siguiente diagrama muestra el flujo completo de operación de TaskFlow Pro, desde el login hasta la finalización de tareas, incluyendo la participación del widget desktop.</p>
+
+  <div class="fc-wrap">
+    <svg viewBox="0 0 860 820" width="820" height="820" xmlns="http://www.w3.org/2000/svg" style="font-family:-apple-system,sans-serif">
+      <!-- DEFS -->
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#6366f1"/>
+        </marker>
+        <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+        </marker>
+        <marker id="arrg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#10b981"/>
+        </marker>
+      </defs>
+
+      <!-- ── INICIO ── -->
+      <rect x="310" y="16" width="200" height="44" rx="22" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+      <text x="410" y="43" text-anchor="middle" fill="#93c5fd" font-size="13" font-weight="700">🔑 Inicio de Sesión</text>
+      <text x="410" y="57" text-anchor="middle" fill="#64748b" font-size="10">(Google OAuth)</text>
+
+      <!-- FLECHA 1 -->
+      <line x1="410" y1="60" x2="410" y2="90" stroke="#6366f1" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- SELECCIÓN EMPRESA -->
+      <rect x="300" y="90" width="220" height="40" rx="8" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+      <text x="410" y="115" text-anchor="middle" fill="#e2e8f0" font-size="13">🏢 Seleccionar Empresa</text>
+
+      <!-- FLECHA 2 -->
+      <line x1="410" y1="130" x2="410" y2="160" stroke="#6366f1" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- ROMBO ROL -->
+      <polygon points="410,160 520,198 410,236 300,198" fill="#2d1b69" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="410" y="193" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">¿Cuál</text>
+      <text x="410" y="208" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">es tu rol?</text>
+
+      <!-- LABELS ROMBO -->
+      <text x="184" y="204" text-anchor="middle" fill="#94a3b8" font-size="11">Operador</text>
+      <text x="410" y="256" text-anchor="middle" fill="#94a3b8" font-size="11">Supervisor</text>
+      <text x="634" y="204" text-anchor="middle" fill="#94a3b8" font-size="11">Dueño / Admin</text>
+
+      <!-- FLECHAS ROL -->
+      <!-- → Operador (izquierda) -->
+      <line x1="300" y1="198" x2="200" y2="198" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <line x1="200" y1="198" x2="200" y2="276" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <!-- → Supervisor (abajo) -->
+      <line x1="410" y1="236" x2="410" y2="276" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <!-- → Dueño (derecha) -->
+      <line x1="520" y1="198" x2="620" y2="198" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <line x1="620" y1="198" x2="620" y2="276" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- ══ RAMA OPERADOR (izquierda) ══ -->
+      <rect x="110" y="276" width="180" height="36" rx="7" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="200" y="299" text-anchor="middle" fill="#e2e8f0" font-size="12">🏠 Ver tareas del día</text>
+
+      <line x1="200" y1="312" x2="200" y2="342" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="110" y="342" width="180" height="36" rx="7" fill="#064e3b" stroke="#059669" stroke-width="1.5"/>
+      <text x="200" y="365" text-anchor="middle" fill="#6ee7b7" font-size="12">▶ Iniciar tarea</text>
+
+      <line x1="200" y1="378" x2="200" y2="408" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- ROMBO tarea en curso -->
+      <polygon points="200,408 265,432 200,456 135,432" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="200" y="427" text-anchor="middle" fill="#94a3b8" font-size="10">¿Continúa?</text>
+      <text x="200" y="441" text-anchor="middle" fill="#94a3b8" font-size="10">¿Pausa?</text>
+
+      <!-- Continúa → completar -->
+      <text x="110" y="445" fill="#94a3b8" font-size="10">Sí</text>
+      <line x1="135" y1="432" x2="100" y2="432" stroke="#94a3b8" stroke-width="1.5"/>
+      <line x1="100" y1="432" x2="100" y2="498" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- Pausa -->
+      <text x="254" y="445" fill="#94a3b8" font-size="10">Pausa</text>
+      <line x1="265" y1="432" x2="295" y2="432" stroke="#94a3b8" stroke-width="1.5"/>
+      <rect x="296" y="416" width="90" height="32" rx="6" fill="#78350f" stroke="#d97706" stroke-width="1.5"/>
+      <text x="341" y="436" text-anchor="middle" fill="#fde68a" font-size="11">⏸ Pausada</text>
+      <!-- flecha pausa → reanudar -->
+      <line x1="341" y1="448" x2="341" y2="476" stroke="#94a3b8" stroke-width="1.5"/>
+      <line x1="341" y1="476" x2="267" y2="476" stroke="#94a3b8" stroke-width="1.5"/>
+      <line x1="267" y1="476" x2="267" y2="455" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="290" y="490" fill="#64748b" font-size="10">▶ Reanudar</text>
+
+      <rect x="55" y="498" width="90" height="36" rx="7" fill="#1a2e1a" stroke="#16a34a" stroke-width="2"/>
+      <text x="100" y="521" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700">■ Completar</text>
+
+      <line x1="100" y1="534" x2="100" y2="562" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrg)"/>
+
+      <rect x="40" y="562" width="120" height="32" rx="6" fill="#1e293b" stroke="#374151" stroke-width="1"/>
+      <text x="100" y="583" text-anchor="middle" fill="#94a3b8" font-size="11">📧 Email al cliente</text>
+      <text x="100" y="595" text-anchor="middle" fill="#64748b" font-size="9">(si configurado)</text>
+
+      <!-- ══ RAMA SUPERVISOR (centro) ══ -->
+      <rect x="320" y="276" width="180" height="36" rx="7" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="410" y="299" text-anchor="middle" fill="#e2e8f0" font-size="12">📅 Ver Agenda del equipo</text>
+
+      <line x1="410" y1="312" x2="410" y2="342" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="320" y="342" width="180" height="36" rx="7" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.5"/>
+      <text x="410" y="365" text-anchor="middle" fill="#a5b4fc" font-size="12">+ Crear y asignar tarea</text>
+
+      <line x1="410" y1="378" x2="410" y2="408" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- ROMBO simple o compleja -->
+      <polygon points="410,408 490,432 410,456 330,432" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="410" y="427" text-anchor="middle" fill="#94a3b8" font-size="10">¿Simple o</text>
+      <text x="410" y="441" text-anchor="middle" fill="#94a3b8" font-size="10">Compleja?</text>
+
+      <!-- Simple -->
+      <text x="316" y="428" fill="#94a3b8" font-size="10" text-anchor="end">Simple</text>
+      <line x1="330" y1="432" x2="310" y2="432" stroke="#94a3b8" stroke-width="1.5"/>
+      <line x1="310" y1="432" x2="310" y2="498" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- Compleja -->
+      <text x="500" y="428" fill="#94a3b8" font-size="10">Compleja</text>
+      <line x1="490" y1="432" x2="510" y2="432" stroke="#94a3b8" stroke-width="1.5"/>
+      <line x1="510" y1="432" x2="510" y2="498" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- Simple box -->
+      <rect x="250" y="498" width="120" height="36" rx="7" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="310" y="521" text-anchor="middle" fill="#e2e8f0" font-size="11">Operador la</text>
+      <text x="310" y="534" text-anchor="middle" fill="#e2e8f0" font-size="11">trabaja</text>
+
+      <!-- Compleja box -->
+      <rect x="450" y="498" width="120" height="36" rx="7" fill="#2d1b69" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="510" y="516" text-anchor="middle" fill="#c4b5fd" font-size="11">Etapas</text>
+      <text x="510" y="530" text-anchor="middle" fill="#c4b5fd" font-size="11">en secuencia</text>
+
+      <line x1="510" y1="534" x2="510" y2="562" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <rect x="450" y="562" width="120" height="32" rx="6" fill="#1e293b" stroke="#374151" stroke-width="1"/>
+      <text x="510" y="583" text-anchor="middle" fill="#94a3b8" font-size="11">Supervisor valida</text>
+
+      <!-- ══ RAMA DUEÑO (derecha) ══ -->
+      <rect x="540" y="276" width="160" height="36" rx="7" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="620" y="299" text-anchor="middle" fill="#e2e8f0" font-size="12">📊 Dashboard</text>
+
+      <line x1="620" y1="312" x2="620" y2="342" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="540" y="342" width="160" height="36" rx="7" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="620" y="365" text-anchor="middle" fill="#e2e8f0" font-size="12">📒 Registro Trabajo</text>
+
+      <line x1="620" y1="378" x2="620" y2="408" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="540" y="408" width="160" height="36" rx="7" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="620" y="431" text-anchor="middle" fill="#e2e8f0" font-size="12">👥 Gestión usuarios</text>
+
+      <line x1="620" y1="444" x2="620" y2="474" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="540" y="474" width="160" height="36" rx="7" fill="#1e293b" stroke="#374151" stroke-width="1.5"/>
+      <text x="620" y="497" text-anchor="middle" fill="#e2e8f0" font-size="12">⚙️ Administración</text>
+
+      <!-- ══ HERENCIA AUTOMÁTICA ══ -->
+      <rect x="190" y="640" width="440" height="44" rx="8" fill="#1a1a2e" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <text x="410" y="658" text-anchor="middle" fill="#a5b4fc" font-size="12" font-weight="700">🕐 Proceso automático — 23:30 hs (días hábiles)</text>
+      <text x="410" y="675" text-anchor="middle" fill="#64748b" font-size="11">Tareas incompletas se heredan al siguiente día hábil</text>
+
+      <line x1="100" y1="598" x2="100" y2="630" stroke="#6366f1" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="100" y1="630" x2="190" y2="650" stroke="#6366f1" stroke-width="1" stroke-dasharray="4,3"/>
+
+      <!-- ══ WIDGET ══ -->
+      <rect x="190" y="720" width="200" height="80" rx="10" fill="#12122b" stroke="#6366f1" stroke-width="2"/>
+      <text x="290" y="745" text-anchor="middle" fill="#818cf8" font-size="12" font-weight="700">🖥️ Widget Desktop</text>
+      <text x="290" y="762" text-anchor="middle" fill="#94a3b8" font-size="11">Control rápido</text>
+      <text x="290" y="778" text-anchor="middle" fill="#64748b" font-size="10">Sincronizado vía token JWT</text>
+
+      <line x1="290" y1="684" x2="290" y2="720" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr)"/>
+
+      <rect x="430" y="720" width="200" height="80" rx="10" fill="#1a2e1a" stroke="#059669" stroke-width="2"/>
+      <text x="530" y="745" text-anchor="middle" fill="#34d399" font-size="12" font-weight="700">🌐 Browser App</text>
+      <text x="530" y="762" text-anchor="middle" fill="#94a3b8" font-size="11">Acceso completo</text>
+      <text x="530" y="778" text-anchor="middle" fill="#64748b" font-size="10">Todos los módulos</text>
+
+      <line x1="530" y1="684" x2="530" y2="720" stroke="#10b981" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrg)"/>
+
+      <!-- Sincronización bidireccional -->
+      <line x1="390" y1="760" x2="430" y2="760" stroke="#6366f1" stroke-width="1.5"/>
+      <text x="410" y="754" text-anchor="middle" fill="#6366f1" font-size="10">⇄</text>
+      <text x="410" y="778" text-anchor="middle" fill="#64748b" font-size="9">Sync token</text>
+
+      <!-- ── LEYENDA ── -->
+      <rect x="696" y="680" width="140" height="100" rx="8" fill="#1e293b" stroke="#374151" stroke-width="1"/>
+      <text x="706" y="698" fill="#94a3b8" font-size="10" font-weight="700">LEYENDA</text>
+      <rect x="706" y="706" width="12" height="12" rx="3" fill="#1e3a5f" stroke="#3b82f6"/>
+      <text x="722" y="717" fill="#94a3b8" font-size="10">Login / Inicio</text>
+      <rect x="706" y="722" width="12" height="12" rx="3" fill="#064e3b" stroke="#059669"/>
+      <text x="722" y="733" fill="#94a3b8" font-size="10">Tarea en curso</text>
+      <rect x="706" y="738" width="12" height="12" rx="3" fill="#2d1b69" stroke="#7c3aed"/>
+      <text x="722" y="749" fill="#94a3b8" font-size="10">Tarea compleja</text>
+      <line x1="706" y1="758" x2="718" y2="758" stroke="#6366f1" stroke-width="2" stroke-dasharray="4,2"/>
+      <text x="722" y="762" fill="#94a3b8" font-size="10">Automático</text>
+      <polygon points="712,772 718,778 712,784 706,778" fill="#2d1b69" stroke="#7c3aed" stroke-width="1"/>
+      <text x="722" y="782" fill="#94a3b8" font-size="10">Decisión</text>
+    </svg>
+  </div>
+
+  <div class="box box-info">
+    <span class="box-icon">📌</span>El flujograma muestra los tres caminos principales según el rol. En la práctica, un mismo usuario puede recorrer más de uno (por ejemplo, un supervisor también opera sus propias tareas).
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 4: INICIO DE SESIÓN             -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="login">
+  <div class="sec-hdr">
+    <h2><span>🔑</span> Inicio de Sesión</h2>
+    <div class="sub">Cómo acceder al sistema</div>
+  </div>
+
+  <p>TaskFlow Pro usa <strong>Google OAuth 2.0</strong> para autenticar usuarios. No hay nombre de usuario ni contraseña propia: se inicia sesión con la cuenta de Google que fue habilitada por el administrador del estudio.</p>
+
+  <div class="box box-warn">
+    <span class="box-icon">⚠️</span>Solo los usuarios cuyo email fue registrado previamente en el sistema pueden ingresar. Si el login con Google tiene éxito pero aparece un error, contactá al administrador para que habilite tu cuenta.
+  </div>
+
+  <div class="mock">
+    <div class="mock-bar">
+      <span class="dot" style="background:#ef4444"></span>
+      <span class="dot" style="background:#f59e0b"></span>
+      <span class="dot" style="background:#10b981"></span>
+      <span>taskflow-pro.vercel.app/login</span>
+    </div>
+    <div class="mock-body" style="text-align:center;padding:40px 20px">
+      <div style="width:56px;height:56px;background:#2563eb;border-radius:14px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:bold;color:white">T</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px">TaskFlow Pro</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:24px">Estudio Contable</div>
+      <hr style="border-color:var(--border);margin-bottom:20px">
+      <div style="color:#cbd5e1;font-size:13px;margin-bottom:14px">Iniciá sesión con tu cuenta de Google</div>
+      <div style="display:inline-flex;align-items:center;gap:10px;background:white;color:#333;border-radius:6px;padding:10px 20px;font-size:13px;font-weight:600">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.6 2.5 30.1 0 24 0 14.6 0 6.6 5.5 2.7 13.6l7.8 6C12.3 13.4 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.5 3-2.2 5.5-4.7 7.2l7.3 5.7c4.3-4 6.8-9.9 7.2-16.9z"/><path fill="#FBBC05" d="M10.5 28.4c-.6-1.6-.9-3.3-.9-5.4 0-2 .3-3.8.9-5.4L2.7 11.6C1 14.8 0 18.3 0 22c0 3.7 1 7.2 2.7 10.4l7.8-4z"/><path fill="#34A853" d="M24 44c6.1 0 11.2-2 15-5.5l-7.3-5.7c-2 1.4-4.6 2.2-7.7 2.2-6.3 0-11.7-4.2-13.6-10l-7.8 4C6.6 36.5 14.6 44 24 44z"/></svg>
+        Continuar con Google
+      </div>
+      <div style="color:var(--muted);font-size:11px;margin-top:16px">Solo usuarios autorizados pueden acceder</div>
+    </div>
+  </div>
+
+  <h3>Pasos para ingresar</h3>
+  <div class="steps">
+    <div class="step"><div class="sn">1</div>Abrí el link del sistema en el browser</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">2</div>Hacé clic en "Continuar con Google"</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">3</div>Elegí o confirmá tu cuenta de Google</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">4</div>Si tenés acceso, entrás al sistema</div>
+  </div>
+
+  <div class="box box-tip">
+    <span class="box-icon">✅</span><strong>Tip:</strong> Guardá el link del sistema en los favoritos del browser para acceder rápido sin necesidad de buscar la URL cada vez.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 5: SELECCIÓN DE EMPRESA         -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="empresa">
+  <div class="sec-hdr">
+    <h2><span>🏢</span> Selección de Empresa</h2>
+    <div class="sub">Multi-empresa y cambio de contexto</div>
+  </div>
+
+  <p>TaskFlow Pro soporta que un mismo usuario trabaje en <strong>múltiples estudios</strong>. Cada sesión tiene una empresa activa que define qué datos son visibles. Para cambiar de empresa, usá el selector en la barra superior.</p>
+
+  <h3>Cambio de empresa</h3>
+  <div class="mock">
+    <div class="mock-bar">
+      <span class="dot" style="background:#ef4444"></span>
+      <span class="dot" style="background:#f59e0b"></span>
+      <span class="dot" style="background:#10b981"></span>
+      <span>Barra superior — selector de empresa</span>
+    </div>
+    <div class="mock-body">
+      <div style="display:flex;align-items:center;gap:12px;padding:8px;background:#1f2937;border-radius:6px">
+        <div style="width:10px;height:10px;border-radius:50%;background:#6366f1;flex-shrink:0"></div>
+        <span style="font-size:13px;font-weight:600">Estudio Bellini</span>
+        <span style="color:var(--muted);font-size:11px">▼ Cambiar empresa</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;color:var(--muted)">María González</span>
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px">M</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="box box-info">
+    <span class="box-icon">🔄</span><strong>Importante:</strong> Al cambiar de empresa, el sistema emite un nuevo token de sesión. Si tenés el widget desktop activo, el cambio se sincroniza automáticamente al widget dentro de segundos. No necesitás cerrar ni reabrir el widget.
+  </div>
+
+  <h3>Efecto del cambio de empresa</h3>
+  <ul>
+    <li>Todos los módulos (Dashboard, Clientes, Agenda, etc.) muestran datos de la empresa seleccionada</li>
+    <li>Las tareas, clientes y usuarios son específicos por empresa</li>
+    <li>El widget desktop refleja la empresa activa del browser en tiempo real</li>
+    <li>Los reportes y el Registro de Trabajo filtran por la empresa activa</li>
+  </ul>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 6: DASHBOARD                    -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="dashboard">
+  <div class="sec-hdr">
+    <h2><span>🏠</span> Dashboard</h2>
+    <div class="sub">Vista general del trabajo del día</div>
+  </div>
+
+  <p>El Dashboard es la pantalla principal al ingresar al sistema. Muestra el <strong>estado del trabajo en tiempo real</strong> para el día actual. La información visible varía según el rol del usuario.</p>
+
+  <h3>Para operadores</h3>
+  <div class="mock">
+    <div class="mock-bar">
+      <span class="dot" style="background:#ef4444"></span>
+      <span class="dot" style="background:#f59e0b"></span>
+      <span class="dot" style="background:#10b981"></span>
+      <span>Dashboard — vista operador</span>
+    </div>
+    <div class="mock-body">
+      <div class="mock-stats">
+        <div class="mock-stat"><div class="n" style="color:#6366f1">4</div><div class="l">Total hoy</div></div>
+        <div class="mock-stat"><div class="n" style="color:#10b981">1</div><div class="l">Completadas</div></div>
+        <div class="mock-stat"><div class="n" style="color:#6b7280">2</div><div class="l">Pendientes</div></div>
+        <div class="mock-stat"><div class="n" style="color:#7c3aed">1h 45m</div><div class="l">Tiempo total</div></div>
+      </div>
+      <div class="mock-row">
+        <span class="bdg bdg-curso">en curso</span>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:600">Liquidación mensual — Empresa ABC</div>
+          <div style="font-size:11px;color:var(--muted)">Iniciada: 09:15 · Tiempo: 45m ▶</div>
+        </div>
+        <span class="bdg bdg-alta">alta</span>
+      </div>
+      <div class="mock-row" style="opacity:.7">
+        <span class="bdg bdg-pend">pendiente</span>
+        <div style="flex:1"><div style="font-size:12px">DJ IVA mensual — Empresa XYZ</div></div>
+        <span class="bdg bdg-media">media</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Para supervisores y dueños</h3>
+  <p>Los supervisores ven un panel adicional con <strong>métricas del equipo</strong>: cuántas tareas tiene asignadas cada operador, cuáles están en curso en este momento, y qué porcentaje de completitud tiene el día.</p>
+
+  <h3>Mi Jornada</h3>
+  <p>El panel <strong>Mi Jornada</strong> (abajo a la derecha en el Dashboard) muestra la distribución visual del tiempo trabajado durante el día seleccionado. Permite navegar a fechas anteriores para revisar la jornada de días pasados.</p>
+
+  <h3>Tarjeta de tarea — controles</h3>
+  <table>
+    <tr><th>Botón</th><th>Acción</th><th>Estado previo requerido</th></tr>
+    <tr><td><strong>▶ Iniciar</strong></td><td>Comienza a contar el tiempo de trabajo</td><td>Pendiente o pausada</td></tr>
+    <tr><td><strong>⏸ Pausar</strong></td><td>Detiene el tiempo sin finalizar la tarea</td><td>En curso</td></tr>
+    <tr><td><strong>▶ Reanudar</strong></td><td>Retoma la tarea después de una pausa</td><td>Pausada</td></tr>
+    <tr><td><strong>■ Finalizar</strong></td><td>Marca la tarea como completada</td><td>En curso (no desde pausa)</td></tr>
+  </table>
+
+  <div class="box box-warn">
+    <span class="box-icon">⚠️</span>Una tarea <strong>pausada no se puede finalizar directamente</strong>. Primero reanudala y luego finalizala. Esto garantiza que el tiempo de pausa se descuente correctamente del tiempo trabajado.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 7: AGENDA                       -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="agenda">
+  <div class="sec-hdr">
+    <h2><span>📅</span> Agenda</h2>
+    <div class="sub">Vista mensual de tareas y asignación masiva</div>
+  </div>
+
+  <p>La Agenda muestra una vista de <strong>calendario mensual</strong> con todas las tareas planificadas. Los supervisores pueden usarla para asignar múltiples tareas de una vez desde el panel de sugerencias.</p>
+
+  <h3>Componentes de la Agenda</h3>
+  <ul>
+    <li><strong>Calendario mensual</strong> — cada día muestra puntos de colores que representan tareas (verde = completada, azul = pendiente, rojo = vencida)</li>
+    <li><strong>Panel de detalle del día</strong> — al hacer clic en un día, se ven todas las tareas de esa fecha con sus controles</li>
+    <li><strong>Panel de sugerencias</strong> (supervisores) — permite seleccionar varias tareas del catálogo y confirmarlas masivamente</li>
+    <li><strong>Filtro por operador</strong> (supervisores) — para ver la agenda de un operador específico o de todo el equipo</li>
+  </ul>
+
+  <h3>Cambio de prioridad inline</h3>
+  <p>Los supervisores pueden <strong>cambiar la prioridad</strong> de una tarea pendiente o pausada directamente desde la tarjeta en la Agenda, sin necesidad de abrirla. Solo las tareas en estado <em>pendiente</em> o <em>pausada</em> permiten este cambio.</p>
+
+  <div class="box box-tip">
+    <span class="box-icon">✅</span><strong>Tip de asignación masiva:</strong> En el panel de sugerencias de la Agenda, podés seleccionar múltiples tareas del catálogo con los checkboxes y confirmarlas todas de una vez. Esto es útil al inicio del mes para cargar las tareas recurrentes de todos los clientes.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 8: TAREAS SIMPLES               -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="tareas">
+  <div class="sec-hdr">
+    <h2><span>✅</span> Tareas Simples</h2>
+    <div class="sub">Crear, asignar y ejecutar tareas individuales</div>
+  </div>
+
+  <p>Una <strong>tarea simple</strong> es una unidad de trabajo asignada a un operador, con fecha, prioridad, y opcionalmente un cliente y un SLA (tiempo máximo para completarla). Es el tipo de tarea más común.</p>
+
+  <h3>Crear una tarea (supervisor)</h3>
+  <div class="steps">
+    <div class="step"><div class="sn">1</div>Ir a <strong>Agenda</strong> y hacer clic en el día deseado</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">2</div>Clic en <strong>"+ Nueva tarea"</strong> en el panel del día</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">3</div>Elegir del catálogo o ingresar nombre personalizado</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">4</div>Asignar operador, prioridad, cliente (opcional)</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">5</div>Guardar</div>
+  </div>
+
+  <h3>Estados y transiciones</h3>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0">
+    <span class="bdg bdg-pend">pendiente</span>
+    <span style="color:var(--muted)">→ (▶ Iniciar) →</span>
+    <span class="bdg bdg-curso">en curso</span>
+    <span style="color:var(--muted)">→ (⏸ Pausar) →</span>
+    <span class="bdg bdg-pausa">pausada</span>
+    <span style="color:var(--muted)">→ (▶ Reanudar) →</span>
+    <span class="bdg bdg-curso">en curso</span>
+    <span style="color:var(--muted)">→ (■ Finalizar) →</span>
+    <span class="bdg bdg-comp">completada</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin:8px 0">
+    <span class="bdg bdg-pend">pendiente</span>
+    <span style="color:var(--muted)">o</span>
+    <span class="bdg bdg-pausa">pausada</span>
+    <span style="color:var(--muted)">→ (si vence el plazo) →</span>
+    <span class="bdg bdg-venc">vencida</span>
+  </div>
+
+  <h3>Prioridades</h3>
+  <table>
+    <tr><th>Prioridad</th><th>Indicador</th><th>Cuándo usarla</th></tr>
+    <tr><td><span class="bdg bdg-urg">🔴 urgente</span></td><td>Rojo</td><td>Debe completarse hoy sin excepción</td></tr>
+    <tr><td><span class="bdg bdg-alta">🟠 alta</span></td><td>Naranja</td><td>Importante, debe completarse en el día</td></tr>
+    <tr><td><span class="bdg bdg-media">🟡 media</span></td><td>Amarillo</td><td>Prioritaria pero no urgente</td></tr>
+    <tr><td><span class="bdg bdg-baja">🟢 baja</span></td><td>Verde</td><td>Puede pasarse al día siguiente si es necesario</td></tr>
+  </table>
+
+  <h3>Herencia de tareas</h3>
+  <p>Todas las noches a las <strong>23:30 hs</strong> (días hábiles), el sistema copia automáticamente las tareas incompletas (pendiente, pausada, en curso) al próximo día hábil. La tarea heredada aparece con una etiqueta <code>↩ heredada</code> en el Dashboard y la Agenda.</p>
+
+  <div class="box box-info">
+    <span class="box-icon">📋</span>Las tareas <strong>vencidas y completadas</strong> no se heredan. Una tarea vencida puede igualmente completarse en días posteriores; en ese caso quedará marcada con el flag "fue vencida" en el historial para referencia futura.
+  </div>
+
+  <h3>SLA y vencimientos</h3>
+  <p>Al crear una tarea, el supervisor puede definir una <strong>fecha de vencimiento</strong> y/o un <strong>SLA en horas</strong>. Cuando el plazo expira sin que la tarea esté completada, el estado pasa automáticamente a <span class="bdg bdg-venc">vencida</span>.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 9: TAREAS COMPLEJAS             -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="complejas">
+  <div class="sec-hdr">
+    <h2><span>🔀</span> Tareas Complejas</h2>
+    <div class="sub">Flujos de trabajo multi-etapa con validaciones</div>
+  </div>
+
+  <p>Una <strong>tarea compleja</strong> es un flujo de trabajo compuesto por múltiples pasos (etapas) que deben ejecutarse en secuencia. Cada etapa puede requerir validación del supervisor antes de que la siguiente quede disponible.</p>
+
+  <h3>Diferencia con las tareas simples</h3>
+  <table>
+    <tr><th></th><th>Tarea simple</th><th>Tarea compleja</th></tr>
+    <tr><td>Pasos</td><td>Un solo paso</td><td>Múltiples etapas ordenadas</td></tr>
+    <tr><td>Validación</td><td>No requerida</td><td>Configurable por etapa</td></tr>
+    <tr><td>Asignación</td><td>Un operador</td><td>Puede variar por etapa</td></tr>
+    <tr><td>SLA</td><td>Por tarea</td><td>Por etapa individual</td></tr>
+    <tr><td>Tiempo</td><td>Total directo</td><td>Suma de tiempos de etapas</td></tr>
+  </table>
+
+  <h3>Flujo de una tarea compleja</h3>
+  <div class="steps" style="flex-wrap:wrap;row-gap:10px">
+    <div class="step"><div class="sn">1</div>Supervisor crea tarea compleja desde el catálogo</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">2</div>Se generan las etapas automáticamente. Solo la primera queda <span class="bdg bdg-pend" style="font-size:9px">pendiente</span>, el resto <em>bloqueadas</em></div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">3</div>Operador inicia la etapa 1 → trabaja → completa</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">4</div>Si requiere validación → pasa a <span class="bdg bdg-val" style="font-size:9px">validación pendiente</span></div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">5</div>Supervisor aprueba → etapa 2 se desbloquea. Si rechaza → vuelve a pendiente</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">6</div>Se repite hasta que todas las etapas están completadas</div>
+  </div>
+
+  <h3>Estados de una etapa</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0">
+    <span class="bdg bdg-pend">pendiente</span>
+    <span class="bdg bdg-curso">en curso</span>
+    <span class="bdg bdg-pausa">pausada</span>
+    <span class="bdg bdg-val">validación pendiente</span>
+    <span class="bdg bdg-comp">completada</span>
+    <span class="bdg bdg-venc">vencida (SLA)</span>
+    <span class="bdg" style="background:#1f2937;color:#6b7280;border:1px solid #374151">bloqueada</span>
+  </div>
+
+  <h3>Acceder a tareas complejas</h3>
+  <p>El módulo <strong>Tareas Complejas</strong> (menú lateral 🔀) muestra todas las ejecuciones activas de tareas complejas. Desde ahí, supervisores y operadores pueden ver el estado de cada etapa, el timeline de validaciones, y el historial de rechazos.</p>
+
+  <div class="box box-warn">
+    <span class="box-icon">⚠️</span>Un operador no puede validar sus propias etapas. La validación siempre debe hacerla un supervisor con un usuario distinto al que ejecutó la etapa.
+  </div>
+
+  <h3>Reasignación de etapa</h3>
+  <p>Si una etapa necesita cambiar de responsable, el supervisor puede reasignarla desde el detalle de la tarea compleja. Solo etapas en estado <em>pendiente</em> o <em>bloqueada</em> admiten reasignación.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 10: SEGUIMIENTO                 -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="seguimiento">
+  <div class="sec-hdr">
+    <h2><span>🔍</span> Seguimiento</h2>
+    <div class="sub">Historial de tareas y log de auditoría</div>
+  </div>
+
+  <p>La sección <strong>Seguimiento</strong> permite consultar el historial de tareas en un rango de fechas con múltiples filtros. Incluye tareas simples y complejas, con visibilidad de qué tareas alguna vez se vencieron.</p>
+
+  <h3>Historial de tareas</h3>
+  <p>Ingresá una fecha de inicio y una de fin, aplicá los filtros que necesitás, y presioná <strong>Buscar</strong>. Los filtros disponibles son:</p>
+  <ul>
+    <li><strong>Rango de fechas</strong> — obligatorio para buscar</li>
+    <li><strong>Operador</strong> (supervisores y dueños) — filtrar por un operador específico o ver todos</li>
+    <li><strong>Cliente</strong> — ver solo tareas de un cliente</li>
+    <li><strong>Estado</strong> — pendiente, en curso, pausada, completada, vencida</li>
+    <li><strong>Prioridad</strong> — urgente, alta, media, baja</li>
+  </ul>
+
+  <h3>Indicadores especiales en el historial</h3>
+  <table>
+    <tr><th>Indicador</th><th>Significado</th></tr>
+    <tr><td><code>↩ heredada</code></td><td>La tarea fue heredada de un día anterior porque no se completó a tiempo</td></tr>
+    <tr><td><code>⚠ fue vencida</code> (naranja)</td><td>La tarea estuvo en estado vencida en algún momento, aunque hoy esté completada</td></tr>
+    <tr><td><code>🔀 compleja</code></td><td>Es una tarea compleja expandible para ver sus etapas</td></tr>
+  </table>
+
+  <h3>Tareas complejas en el historial</h3>
+  <p>Las tareas complejas aparecen con un botón <strong>▶</strong> que permite expandirlas para ver cada etapa. El estado y tiempo de la tarea compleja se calcula como la suma de sus etapas. Si alguna etapa tuvo el SLA vencido, la tarea compleja también muestra el indicador.</p>
+
+  <div class="box box-tip">
+    <span class="box-icon">✅</span>Usá el botón <strong>⊕ Expandir todas</strong> para ver las etapas de todas las tareas complejas del resultado de una sola vez. Útil para revisiones de período.
+  </div>
+
+  <h3>Exportar a CSV</h3>
+  <p>Cuando hay resultados, el botón <strong>⬇ CSV</strong> descarga el historial como archivo de planilla. El CSV incluye las columnas: fecha, tarea, tipo (simple/compleja), operador, cliente, estado, fue_vencida, prioridad y tiempo en minutos.</p>
+
+  <h3>Log de auditoría</h3>
+  <p>Los usuarios con rol <strong>dueño</strong> o <strong>administrador</strong> tienen acceso a una pestaña adicional: el <strong>Log de auditoría</strong>. Registra todos los cambios del sistema (INSERT, UPDATE, DELETE) con timestamp, usuario que realizó la acción, campo modificado y valores anterior/nuevo.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 11: REGISTRO DE TRABAJO         -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="registro">
+  <div class="sec-hdr">
+    <h2><span>📒</span> Registro de Trabajo</h2>
+    <div class="sub">Consulta mensual exportable de lo ejecutado</div>
+  </div>
+
+  <p>El <strong>Registro de Trabajo</strong> es el equivalente digital de la planilla de control mensual. Permite consultar todo lo ejecutado en un mes para determinados clientes o tipos de tarea, con exportación a CSV.</p>
+
+  <h3>Navegación por mes</h3>
+  <p>Usá los botones <strong>‹</strong> y <strong>›</strong> para navegar entre meses. No hay rangos de fechas manuales: cada consulta cubre un mes calendario completo.</p>
+
+  <h3>Dos modos de visualización</h3>
+
+  <h4>📁 Por cliente</h4>
+  <p>Agrupa todas las tareas bajo el nombre del cliente. Dentro de cada cliente, una fila por tarea. Las tareas complejas son expandibles para ver sus etapas.</p>
+
+  <h4>📋 Por tarea</h4>
+  <p>Agrupa por tipo de tarea del catálogo. La cabecera de la tarea aparece <strong>una sola vez</strong>; debajo, una fila por cada cliente donde se realizó esa tarea. Para tareas complejas, los pasos aparecen como <strong>columnas</strong> con fecha de cumplimiento y tiempo.</p>
+
+  <div class="box box-info">
+    <span class="box-icon">💡</span>El modo <strong>Por tarea</strong> es especialmente útil cuando la misma tarea recurrente se realiza para muchos clientes (por ejemplo, liquidación de sueldos): la cabecera de columnas se muestra una vez y los datos de cada cliente debajo, igual que una planilla tradicional.
+  </div>
+
+  <h3>Filtros disponibles</h3>
+  <ul>
+    <li><strong>Clientes</strong> — multi-selección: elegí uno o varios clientes específicos</li>
+    <li><strong>Rubro</strong> — filtra el catálogo de tareas por área (impuestos, laboral, etc.)</li>
+    <li><strong>Tareas del catálogo</strong> — multi-selección filtrada por el rubro elegido</li>
+  </ul>
+
+  <h3>Opciones visuales</h3>
+  <ul>
+    <li><strong>☑ Mostrar si fue vencida</strong> — agrega una columna o indicador visual para tareas que alguna vez estuvieron vencidas</li>
+    <li><strong>☐ Mostrar SLA de pasos</strong> — en tareas complejas, muestra la fecha SLA de cada paso además de la fecha real de cumplimiento</li>
+  </ul>
+
+  <h3>Exportar</h3>
+  <p>Cada modo tiene su propio botón <strong>⬇ Exportar CSV</strong>. El archivo generado tiene una columna por cada dato visible en pantalla. Para tareas complejas en modo "Por tarea", cada paso es una columna con formato <em>fecha · tiempo</em>.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 12: REPORTES                    -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="reportes">
+  <div class="sec-hdr">
+    <h2><span>📊</span> Reportes</h2>
+    <div class="sub">Métricas y análisis de rendimiento</div>
+  </div>
+
+  <p>La sección <strong>Reportes</strong> provee métricas consolidadas del trabajo del estudio. Los datos son read-only y están orientados a toma de decisiones.</p>
+
+  <h3>Tipos de reporte disponibles</h3>
+  <table>
+    <tr><th>Reporte</th><th>Qué muestra</th></tr>
+    <tr><td><strong>Resumen mensual</strong></td><td>Total de tareas, completadas, vencidas, tiempo trabajado y brecha para el mes seleccionado</td></tr>
+    <tr><td><strong>Por cliente</strong></td><td>Tareas y tiempo dedicado a cada cliente en el período</td></tr>
+    <tr><td><strong>Por rubro</strong></td><td>Distribución del trabajo por área (impuestos, laboral, etc.) con gráfico de porcentajes</td></tr>
+    <tr><td><strong>Comparativo operadores</strong></td><td>Comparación de rendimiento entre operadores: tareas completadas, horas trabajadas, clientes atendidos</td></tr>
+  </table>
+
+  <h3>Filtros de reportes</h3>
+  <ul>
+    <li>Selección de <strong>año y mes</strong> para todos los reportes</li>
+    <li>Filtro por operador específico (supervisores y dueños)</li>
+  </ul>
+
+  <div class="box box-tip">
+    <span class="box-icon">✅</span>Para análisis más detallados, combiná Reportes (visión general del período) con el Registro de Trabajo (detalle tarea por tarea) y el Historial de Seguimiento (análisis por fechas).
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 13: CLIENTES                    -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="clientes">
+  <div class="sec-hdr">
+    <h2><span>👥</span> Clientes</h2>
+    <div class="sub">Gestión del listado de clientes del estudio</div>
+  </div>
+
+  <p>La sección <strong>Clientes</strong> mantiene el directorio de clientes del estudio. Los clientes se asocian a las tareas para poder agrupar el trabajo por cliente en reportes y el Registro de Trabajo.</p>
+
+  <h3>Datos de un cliente</h3>
+  <ul>
+    <li>Razón social</li>
+    <li>CUIT (validado con algoritmo AFIP módulo 11)</li>
+    <li>Email, teléfono, dirección, localidad, provincia</li>
+    <li>Responsable interno del estudio</li>
+    <li>Notas libres</li>
+    <li>Servicios contratados (con fechas de vigencia)</li>
+  </ul>
+
+  <h3>Permisos</h3>
+  <p>Solo los usuarios con rol <strong>supervisor, dueño o administrador</strong> pueden crear, editar, activar o desactivar clientes. Los operadores tienen acceso de solo lectura.</p>
+
+  <h3>Servicios del cliente</h3>
+  <p>Desde el detalle de un cliente, se pueden gestionar los <strong>servicios contratados</strong>. Cada servicio tiene una fecha de inicio y una fecha de baja opcional. Un servicio está vigente si está activo y no tiene fecha de baja o la fecha de baja es futura.</p>
+
+  <div class="box box-info">
+    <span class="box-icon">💡</span>Los servicios contratados son usados en el Registro de Trabajo para la vista "Por cliente", mostrando qué servicios tiene activos cada empresa.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 14: ADMINISTRACIÓN              -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="admin">
+  <div class="sec-hdr">
+    <h2><span>⚙️</span> Gestión Administrativa</h2>
+    <div class="sub">Configuración del sistema — solo dueños y administradores</div>
+  </div>
+
+  <p>La sección <strong>Administración</strong> solo es visible para usuarios con rol dueño o administrador. Contiene todos los parámetros de configuración del sistema.</p>
+
+  <h3>Gestión de Usuarios</h3>
+  <p>Desde aquí se crean y gestionan los usuarios del sistema.</p>
+  <ul>
+    <li><strong>Crear usuario</strong>: ingresá nombre, apellido, email de Google y asigná perfiles (roles)</li>
+    <li><strong>Editar perfiles</strong>: podés cambiar los roles de un usuario en cualquier momento</li>
+    <li><strong>Activar / desactivar</strong>: un usuario desactivado no puede iniciar sesión</li>
+  </ul>
+  <div class="box box-warn">
+    <span class="box-icon">⚠️</span>El email debe ser exactamente el email de la cuenta de Google que usará la persona para ingresar. Si hay una diferencia de mayúsculas o un error, el login fallará.
+  </div>
+
+  <h3>Gestión de Empresas (multi-empresa)</h3>
+  <p>Permite crear nuevas empresas y asignar usuarios a cada una.</p>
+  <ul>
+    <li><strong>Crear empresa</strong>: nombre, zona horaria, color de identificación, email de notificaciones</li>
+    <li><strong>Asignar usuarios</strong>: desde el panel de cada empresa, usar el dropdown para agregar un usuario. Los usuarios pueden pertenecer a múltiples empresas</li>
+    <li><strong>Quitar usuarios</strong>: el botón ✕ junto al usuario lo desvincula de esa empresa</li>
+  </ul>
+
+  <h3>Catálogo de Tareas</h3>
+  <p>El catálogo define las <strong>plantillas reutilizables</strong> de tareas. Cada entrada tiene:</p>
+  <ul>
+    <li>Código único (ej: <code>LIQ-001</code>)</li>
+    <li>Nombre y descripción</li>
+    <li>Rubro de categorización</li>
+    <li>Duración estimada y SLA default</li>
+    <li>Prioridad default</li>
+    <li>Flag de tarea compleja</li>
+    <li>Configuración de email automático al completar (asunto, cuerpo, destinatario)</li>
+  </ul>
+
+  <h3>Rubros</h3>
+  <p>Los rubros organizan el catálogo en categorías temáticas (ej: Impuestos, Laboral, Societario). Cada rubro tiene un color e ícono para identificación visual en los reportes y el Registro de Trabajo.</p>
+
+  <h3>Feriados</h3>
+  <p>Define los días no hábiles para el estudio. El sistema usa esta lista para la herencia automática de tareas (saltea feriados al calcular el próximo día hábil).</p>
+  <ul>
+    <li><strong>Crear feriado</strong>: fecha, nombre y tipo (nacional / provincial / especial)</li>
+    <li><strong>Duplicar año</strong>: copia los feriados de un año a otro (útil al inicio de cada año)</li>
+  </ul>
+
+  <h3>Mi Empresa</h3>
+  <p>Configuración general de la empresa activa: logo, SMTP para envío de emails, horarios de trabajo y configuración regional.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 15: WIDGET DESKTOP              -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="widget">
+  <div class="sec-hdr">
+    <h2><span>🖥️</span> Widget Desktop</h2>
+    <div class="sub">Control rápido desde la barra de tareas de Windows</div>
+  </div>
+
+  <p>El <strong>widget desktop</strong> es una aplicación PyQt6 para Windows que permite a los operadores controlar sus tareas sin abrir el browser. Vive en la <strong>barra de tareas del sistema</strong> (system tray) y se puede expandir con un clic.</p>
+
+  <h3>Instalación y primer arranque</h3>
+  <div class="steps">
+    <div class="step"><div class="sn">1</div>Descargar el instalador <code>.exe</code> provisto por el administrador</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">2</div>Ejecutar el instalador (puede requerir permiso de administrador)</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">3</div>El widget aparece en la barra de tareas al inicio del sistema</div>
+    <div class="sarrow">→</div>
+    <div class="step"><div class="sn">4</div>El widget se conecta al servidor y recibe el token del browser</div>
+  </div>
+
+  <div class="box box-info">
+    <span class="box-icon">💡</span>El widget NO requiere que ingreses usuario/contraseña de forma independiente. Usa el mismo token de autenticación que el browser, que se sincroniza automáticamente cuando iniciás sesión en la app web.
+  </div>
+
+  <h3>Interfaz del widget</h3>
+  <div class="widget-wrap">
+    <div class="widget">
+      <div class="wt">
+        <span>🖥️ TaskFlow Widget</span>
+        <span style="color:var(--green);font-size:11px">● conectado</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">📅 Miércoles 4 de junio · Estudio Bellini</div>
+      <div class="wtask">
+        <span class="bdg bdg-curso" style="font-size:9px">en curso</span>
+        <div style="flex:1;font-size:11px">
+          <div style="font-weight:600">Liquidación sueldos</div>
+          <div style="color:var(--muted)">⏱ 45 min ▶</div>
+        </div>
+      </div>
+      <div class="wtask" style="opacity:.7">
+        <span class="bdg bdg-pend" style="font-size:9px">pendiente</span>
+        <div style="flex:1;font-size:11px">DJ IVA mensual</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="wbtn">⏸ Pausar</button>
+        <button class="wbtn" style="background:#10b981">■ Finalizar</button>
+      </div>
+    </div>
+    <div style="flex:1;min-width:200px">
+      <h4>Funciones del widget</h4>
+      <ul>
+        <li>Ver las tareas del día actual</li>
+        <li>Iniciar, pausar, reanudar y finalizar tareas</li>
+        <li>Ver el tiempo transcurrido en la tarea activa</li>
+        <li>Recibir notificaciones de herencia y vencimientos</li>
+        <li>Cambiar de empresa (refleja en el browser)</li>
+        <li>Minimizar a system tray con doble clic</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Instancia única</h3>
+  <p>El widget garantiza que solo exista <strong>una instancia activa</strong>. Si intentás abrir el widget por segunda vez, la instancia existente se trae al frente en lugar de abrir una segunda ventana.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 16: CONVIVENCIA BROWSER+WIDGET  -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="convivencia">
+  <div class="sec-hdr">
+    <h2><span>🔗</span> Browser + Widget — Convivencia</h2>
+    <div class="sub">Cómo se sincronizan las dos superficies</div>
+  </div>
+
+  <p>El browser y el widget son <strong>dos vistas del mismo sistema</strong>. Comparten el estado de las tareas en tiempo real. Cualquier acción que hagas en uno se refleja en el otro al refrescar.</p>
+
+  <h3>Diagrama de sincronización</h3>
+  <div class="sync-diag">
+    <div class="sync-box active">
+      <div class="sb-icon">🌐</div>
+      <div style="font-weight:700;font-size:14px">Browser</div>
+      <div class="sb-label">Acceso completo</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Token JWT en localStorage</div>
+    </div>
+    <div class="sync-arrow">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Token JWT</div>
+      <div class="arrow-line"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Puerto 9876</div>
+    </div>
+    <div class="sync-box active">
+      <div class="sb-icon">🖥️</div>
+      <div style="font-weight:700;font-size:14px">Widget</div>
+      <div class="sb-label">Control rápido</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Servidor local :9876</div>
+    </div>
+    <div class="sync-arrow">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">HTTP API</div>
+      <div class="arrow-line" style="--arrowdir:1"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Internet</div>
+    </div>
+    <div class="sync-box">
+      <div class="sb-icon">☁️</div>
+      <div style="font-weight:700;font-size:14px">Servidor</div>
+      <div class="sb-label">Backend API</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Render / Railway</div>
+    </div>
+  </div>
+
+  <h3>Cómo funciona la sincronización del token</h3>
+  <ol>
+    <li>Al hacer login en el browser, el sistema genera un <strong>token JWT</strong></li>
+    <li>El browser envía ese token al puerto local <code>9876</code> donde el widget escucha</li>
+    <li>El widget almacena el token y lo usa para comunicarse con el servidor</li>
+    <li>Cuando el usuario <strong>cambia de empresa</strong> en el browser, se emite un nuevo token que se reenvía automáticamente al widget</li>
+  </ol>
+
+  <h3>Escenarios de uso combinado</h3>
+  <table>
+    <tr><th>Escenario</th><th>Browser</th><th>Widget</th></tr>
+    <tr>
+      <td>Operador trabajando</td>
+      <td>Puede estar cerrado o en otra pantalla</td>
+      <td>Muestra la tarea activa con timer en vivo</td>
+    </tr>
+    <tr>
+      <td>Pausar desde widget</td>
+      <td>Si lo abrís luego, la tarea ya aparece pausada</td>
+      <td>Botón ⏸ disponible mientras la tarea está en curso</td>
+    </tr>
+    <tr>
+      <td>Supervisor asigna tarea nueva</td>
+      <td>Supervisor la crea y asigna</td>
+      <td>Operador la ve al refrescar el widget</td>
+    </tr>
+    <tr>
+      <td>Cambio de empresa</td>
+      <td>Usuario selecciona otra empresa en la barra</td>
+      <td>Recibe el nuevo token automáticamente y cambia de contexto</td>
+    </tr>
+    <tr>
+      <td>Fin del día (23:30)</td>
+      <td>Las tareas heredadas aparecen al día siguiente</td>
+      <td>El widget muestra las tareas heredadas con etiqueta ↩</td>
+    </tr>
+  </table>
+
+  <div class="box box-warn">
+    <span class="box-icon">⚠️</span>Si el widget muestra "sin conexión" o "token inválido", la solución es cerrar sesión en el browser y volver a iniciar. El nuevo login enviará un token fresco al widget automáticamente.
+  </div>
+
+  <div class="box box-tip">
+    <span class="box-icon">✅</span><strong>Buenas prácticas:</strong> Mantené el browser abierto en segundo plano mientras trabajás. El widget es la superficie de control diario, pero el browser provee el contexto completo (clientes, historial, reportes). Lo ideal es usar el widget para play/pause/finish y el browser para planificación y revisión de trabajo.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- SECCIÓN 17: GLOSARIO                    -->
+<!-- ════════════════════════════════════════ -->
+<div class="section" id="glosario">
+  <div class="sec-hdr">
+    <h2><span>📖</span> Glosario</h2>
+    <div class="sub">Términos y estados del sistema</div>
+  </div>
+
+  <div class="gloss-item">
+    <div class="gloss-term">Tarea simple</div>
+    <div class="gloss-def">Unidad de trabajo asignada a un operador con fecha, prioridad y cliente opcional. Tiene un único ciclo de vida: pendiente → en curso → completada.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Tarea compleja</div>
+    <div class="gloss-def">Flujo de trabajo compuesto por múltiples etapas ordenadas. Cada etapa puede requerir validación del supervisor. El tiempo total es la suma de las etapas.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Etapa / Paso</div>
+    <div class="gloss-def">Componente individual de una tarea compleja. Tiene su propio estado, SLA y operador asignado.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Herencia de tarea</div>
+    <div class="gloss-def">Proceso automático que corre a las 23:30 hs en días hábiles. Copia todas las tareas incompletas al siguiente día hábil, marcándolas como "heredadas".</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">SLA (Service Level Agreement)</div>
+    <div class="gloss-def">Plazo máximo (en horas o con fecha límite) para completar una tarea o etapa. Si el plazo vence sin finalizar, el estado cambia automáticamente a "vencida".</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Fue vencida</div>
+    <div class="gloss-def">Indicador que marca que una tarea o etapa pasó por el estado "vencida" en algún momento, aunque hoy esté completada. Persiste en el historial para análisis de SLA.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Token JWT</div>
+    <div class="gloss-def">Credencial de sesión encriptada que identifica al usuario y su empresa activa. Se genera al hacer login y tiene una duración limitada. El browser y el widget comparten el mismo token.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Catálogo de tareas</div>
+    <div class="gloss-def">Biblioteca de plantillas reutilizables definidas por el administrador. Al crear una tarea desde el catálogo, se heredan nombre, duración estimada, SLA, prioridad y configuración de email.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Rubro</div>
+    <div class="gloss-def">Categoría temática del catálogo de tareas (ej: Impuestos, Laboral, Societario). Se usa para filtrar tareas en el Registro de Trabajo y en reportes por rubro.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Multi-empresa</div>
+    <div class="gloss-def">Capacidad del sistema de alojar múltiples estudios contables. Un usuario puede pertenecer a varios estudios y cambiar entre ellos desde el selector en la barra superior.</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Validación pendiente</div>
+    <div class="gloss-def">Estado de una etapa de tarea compleja que fue completada por el operador y está esperando aprobación del supervisor. El supervisor puede aprobar (pasa a completada) o rechazar (vuelve a pendiente).</div>
+  </div>
+  <div class="gloss-item">
+    <div class="gloss-term">Tiempo trabajado neto</div>
+    <div class="gloss-def">Tiempo real de trabajo efectivo. Se calcula como el tiempo total transcurrido desde el inicio hasta el fin, menos los tiempos de pausa.</div>
+  </div>
+
+  <h3>Estados de tarea</h3>
+  <table>
+    <tr><th>Estado</th><th>Badge</th><th>Descripción</th></tr>
+    <tr><td>pendiente</td><td><span class="bdg bdg-pend">pendiente</span></td><td>Asignada pero no iniciada aún</td></tr>
+    <tr><td>en curso</td><td><span class="bdg bdg-curso">en curso</span></td><td>El operador está trabajando activamente en ella. El timer está corriendo.</td></tr>
+    <tr><td>pausada</td><td><span class="bdg bdg-pausa">pausada</span></td><td>El operador la interrumpió temporalmente. El timer está detenido.</td></tr>
+    <tr><td>completada</td><td><span class="bdg bdg-comp">completada</span></td><td>El operador la finalizó correctamente.</td></tr>
+    <tr><td>vencida</td><td><span class="bdg bdg-venc">vencida</span></td><td>El plazo venció sin que se completara. Puede igualmente completarse.</td></tr>
+    <tr><td>validación pendiente</td><td><span class="bdg bdg-val">validación pendiente</span></td><td>Solo en tareas complejas. La etapa fue completada y espera aprobación del supervisor.</td></tr>
+  </table>
+
+  <div style="margin-top:48px;padding:20px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);text-align:center">
+    <div style="font-size:12px;color:var(--muted)">TaskFlow Pro — Manual de Usuario v1.0 · Junio 2026</div>
+    <div style="font-size:11px;color:#4b5563;margin-top:4px">Para soporte técnico, contactá al administrador del sistema</div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// Activar link del sidebar según sección visible
+const links = document.querySelectorAll('.sb-link');
+const sections = document.querySelectorAll('.section');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const a = document.querySelector(`.sb-link[href="#${e.target.id}"]`);
+      if (a) a.classList.add('active');
+    }
+  });
+}, { threshold: 0.2, rootMargin: '-80px 0px -60% 0px' });
+sections.forEach(s => obs.observe(s));
+
+// Smooth scroll al hacer click
+links.forEach(l => l.addEventListener('click', e => {
+  e.preventDefault();
+  const t = document.querySelector(l.getAttribute('href'));
+  if (t) t.scrollIntoView({ behavior: 'smooth' });
+}));
+</script>
+</body>
+</html>
