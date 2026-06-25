@@ -26,8 +26,10 @@
  *            Columna Localidad reemplazada por Servicios.
  * =============================================================
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { api } from "../api/client.js";
+import { AuthContext } from "../context/AuthContext.jsx";
+import { useResponsive } from "../hooks/useResponsive.js";
 
 /* ── Estilos base ───────────────────────────────────────────── */
 const E = {
@@ -265,7 +267,7 @@ function BadgeServicios({ clienteId, cantidad }) {
      Formulario reutilizable para crear o editar un cliente.
      Indicadores de validez en tiempo real para CUIT y email.
    ============================================================= */
-function FormCliente({ inicial, onGuardar, onCancelar }) {
+function FormCliente({ inicial, onGuardar, onCancelar, isMobile }) {
   const [f, setF] = useState({
     razon_social: inicial?.razon_social || "",
     cuit:         inicial?.cuit         || "",
@@ -300,7 +302,7 @@ function FormCliente({ inicial, onGuardar, onCancelar }) {
       <h3 style={{ margin:"0 0 16px", fontSize:"15px", color:"white" }}>
         {inicial ? `✏️ Editando: ${inicial.razon_social}` : "Nuevo Cliente"}
       </h3>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:"12px", marginBottom:"12px" }}>
         <div style={{ gridColumn:"1 / -1" }}>
           <label style={E.label}>Razón social *</label>
           <input style={E.input} value={f.razon_social}
@@ -614,6 +616,7 @@ export default function Clientes() {
   const [clientes, setClientes]                 = useState([]);
   const [cargando, setCargando]                 = useState(false);
   const { usuario } = useContext(AuthContext);
+  const { isMobile } = useResponsive();
   const esOperador = usuario?.perfiles?.includes("operador") &&
     !usuario?.perfiles?.includes("supervisor") &&
     !usuario?.perfiles?.includes("administrador") &&
@@ -706,13 +709,13 @@ export default function Clientes() {
         {/* Formulario alta */}
         {mostrarForm && !clienteEditando && (
           <FormCliente inicial={null} onGuardar={crearCliente}
-            onCancelar={() => setMostrarForm(false)} />
+            onCancelar={() => setMostrarForm(false)} isMobile={isMobile} />
         )}
 
         {/* Formulario edición */}
         {clienteEditando && (
           <FormCliente inicial={clienteEditando} onGuardar={editarCliente}
-            onCancelar={() => setClienteEditando(null)} />
+            onCancelar={() => setClienteEditando(null)} isMobile={isMobile} />
         )}
 
         {/* Filtros */}
@@ -731,19 +734,22 @@ export default function Clientes() {
           </span>
         </div>
 
-        {/* Tabla */}
+        {/* Tabla — con scroll horizontal en mobile */}
         {cargando ? (
           <div style={{ textAlign:"center", padding:"40px", color:"#6b7280" }}>⏳ Cargando...</div>
         ) : (
           <div style={{ background:"#111827", borderRadius:"10px",
-            border:"1px solid #1f2937", overflow:"hidden" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px" }}>
+            border:"1px solid #1f2937", overflow:"hidden",
+            overflowX: isMobile ? "auto" : "hidden",
+            WebkitOverflowScrolling:"touch" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px",
+              minWidth: isMobile ? "600px" : "auto" }}>
               <thead>
                 <tr style={{ background:"#1f2937", color:"#9ca3af" }}>
                   <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Razón social</th>
-                  <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>CUIT</th>
+                  {!isMobile && <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>CUIT</th>}
                   <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Email</th>
-                  <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Servicios</th>
+                  {!isMobile && <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Servicios</th>}
                   <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Estado</th>
                   <th style={{ padding:"12px 16px" }}></th>
                 </tr>
@@ -763,19 +769,23 @@ export default function Clientes() {
                             style={{ marginLeft:"6px", color:"#6b7280", cursor:"help" }}>📝</span>
                         )}
                       </td>
-                      {/* CUIT */}
-                      <td style={{ padding:"11px 16px", color:"#9ca3af", fontFamily:"monospace" }}>
-                        {formatearCuit(c.cuit)}
-                      </td>
+                      {/* CUIT — oculto en mobile */}
+                      {!isMobile && (
+                        <td style={{ padding:"11px 16px", color:"#9ca3af", fontFamily:"monospace" }}>
+                          {formatearCuit(c.cuit)}
+                        </td>
+                      )}
                       {/* Email */}
                       <td style={{ padding:"11px 16px", color:"#9ca3af" }}>{c.email || "—"}</td>
-                      {/* Badge de servicios con popover */}
-                      <td style={{ padding:"11px 16px" }}>
-                        <BadgeServicios
-                          clienteId={c.id}
-                          cantidad={c.cantidad_servicios || 0}
-                        />
-                      </td>
+                      {/* Badge de servicios — oculto en mobile */}
+                      {!isMobile && (
+                        <td style={{ padding:"11px 16px" }}>
+                          <BadgeServicios
+                            clienteId={c.id}
+                            cantidad={c.cantidad_servicios || 0}
+                          />
+                        </td>
+                      )}
                       {/* Estado */}
                       <td style={{ padding:"11px 16px" }}>
                         <span style={{

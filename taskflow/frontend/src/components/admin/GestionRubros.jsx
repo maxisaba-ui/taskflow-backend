@@ -272,9 +272,10 @@ export default function GestionRubros() {
         </div>
       ) : (
         <div style={{ background:"#111827", borderRadius:"8px",
-          border:"1px solid #1f2937", overflow:"hidden" }}>
+          border:"1px solid #1f2937", overflow:"hidden",
+          overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
           <table style={{ width:"100%", borderCollapse:"collapse",
-            fontSize:"13px" }}>
+            fontSize:"13px", minWidth:"420px" }}>
             <thead>
               <tr style={{ background:"#1f2937" }}>
                 <th style={{ textAlign:"left", padding:"10px 14px",

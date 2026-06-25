@@ -1,2 +1,10 @@
 taskflow/backend/.env
 taskflow/backend/.env.example
+
+# Widget build artifacts
+taskflow/widget/build/
+taskflow/widget/dist/
+
+# Mobile project node_modules y cache
+taskflow-mobile/node_modules/
+taskflow-mobile/.expo/

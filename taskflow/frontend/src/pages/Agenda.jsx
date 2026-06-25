@@ -21,6 +21,7 @@ import { SLABadge, estadoSla } from "../utils/slaHelpers.jsx";
 import React, { useState, useEffect, useRef, useContext, useCallback } from "react";
 import { api } from "../api/client.js";
 import { AuthContext } from "../context/AuthContext.jsx";
+import { useResponsive } from "../hooks/useResponsive.js";
 
 const DIAS_SEMANA_7 = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const DIAS_SEMANA_5 = ["Lun","Mar","Mié","Jue","Vie"];
@@ -857,6 +858,7 @@ function SelectorVista({ vista, onChange }) {
    ============================================================= */
 export default function Agenda() {
   const { usuario } = useContext(AuthContext);
+  const { isMobile } = useResponsive();
   const hoy  = new Date();
   const [anio, setAnio]   = useState(hoy.getFullYear());
   const [mes,  setMes]    = useState(hoy.getMonth() + 1);
@@ -1092,16 +1094,19 @@ export default function Agenda() {
           </button>
         </div>
 
-        {/* Layout */}
+        {/* Layout — en mobile siempre columna única, panel de día va abajo */}
         <div style={{ display:"grid",
-          gridTemplateColumns: (diaSeleccionado||mostrarSugerencias) ? "1fr 340px" : "1fr",
+          gridTemplateColumns: (!isMobile && (diaSeleccionado||mostrarSugerencias)) ? "1fr 340px" : "1fr",
           gap:"20px", alignItems:"start" }}>
 
-          <div>
-            {/* Cabecera dias */}
+          {/* Wrapper scrolleable horizontal en mobile para el calendario */}
+          <div style={{ overflowX: isMobile ? "auto" : "visible",
+            WebkitOverflowScrolling:"touch" }}>
+            {/* Cabecera dias — ancho mínimo en mobile para que sea usable */}
             <div style={{ display:"grid",
-              gridTemplateColumns:`repeat(${diasSemana.length},1fr)`,
-              gap:"2px", marginBottom:"2px" }}>
+              gridTemplateColumns:`repeat(${diasSemana.length},${isMobile ? "minmax(100px,1fr)" : "1fr"})`,
+              gap:"2px", marginBottom:"2px",
+              minWidth: isMobile ? `${diasSemana.length * 100}px` : "auto" }}>
               {diasSemana.map(d=>(
                 <div key={d} style={{ textAlign:"center", fontSize:"11px",
                   fontWeight:"700", color:"#6b7280", padding:"6px 0" }}>{d}</div>
@@ -1115,8 +1120,9 @@ export default function Agenda() {
             ) : (
               semanas.map((semana, si) => (
                 <div key={si} style={{ display:"grid",
-                  gridTemplateColumns:`repeat(${diasSemana.length},1fr)`,
-                  gap:"2px", marginBottom:"2px" }}>
+                  gridTemplateColumns:`repeat(${diasSemana.length},${isMobile ? "minmax(100px,1fr)" : "1fr"})`,
+                  gap:"2px", marginBottom:"2px",
+                  minWidth: isMobile ? `${diasSemana.length * 100}px` : "auto" }}>
                   {semana.map((dia, di) => {
                     if (!dia) return (
                       <div key={di} style={{ background:"#0a0f1a", borderRadius:"6px",
@@ -1175,7 +1181,7 @@ export default function Agenda() {
                 </div>
               ))
             )}
-          </div>
+          </div> {/* cierre scroll wrapper mobile */}
 
           {diaSeleccionado && !mostrarSugerencias && (
             <PanelDia fecha={diaSeleccionado} tareas={tareasDiaSel}

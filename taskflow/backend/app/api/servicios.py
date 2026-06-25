@@ -34,6 +34,7 @@ import uuid                                                    # Generación de 
 # ── Importaciones internas del proyecto ─────────────────────────────────────
 from app.core.database import get_db                           # Dependencia de sesión de BD
 from app.api.auth import obtener_usuario_actual, obtener_empresa_id                # Dependencia de autenticación JWT/OAuth
+from app.api.tareas import _obtener_perfiles                   # Helper para verificar perfiles de usuario
 from app.models.usuario import Usuario                         # Modelo ORM de usuario
 
 # ── Inicialización del router ────────────────────────────────────────────────
@@ -162,6 +163,9 @@ async def crear_servicio(
       Verifica unicidad de código y existencia del padre antes de insertar.
       Genera UUID nuevo para el registro. Retorna el ID creado.
     """
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if not any(p in perfiles for p in ("supervisor", "dueno", "administrador")):
+        raise HTTPException(403, "Solo supervisores y administradores pueden crear servicios")
     # Verificar que no exista otro servicio activo con el mismo código
     existe = await db.execute(text(
         "SELECT id FROM servicios WHERE codigo = :codigo AND activo = TRUE"
@@ -219,6 +223,9 @@ async def editar_servicio(
     DESCRIPCIÓN TÉCNICA:
       Verifica existencia antes de actualizar. No modifica el campo codigo.
     """
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if not any(p in perfiles for p in ("supervisor", "dueno", "administrador")):
+        raise HTTPException(403, "Solo supervisores y administradores pueden editar servicios")
     # Verificar que el servicio a editar exista y esté activo
     existe = await db.execute(text(
         "SELECT id FROM servicios WHERE id = :id AND activo = TRUE"
@@ -258,11 +265,28 @@ async def eliminar_servicio(
     """
     DESCRIPCIÓN FUNCIONAL:
       Desactiva un servicio (baja lógica, no elimina físicamente).
+      Verifica que no tenga tareas activas pendientes asignadas antes de desactivar.
       El registro queda en BD con activo=FALSE para auditoría histórica.
     DESCRIPCIÓN TÉCNICA:
-      Simple UPDATE de flag activo. No verifica impacto en sub-servicios
-      ni en tareas asignadas (pendiente: ítem 4 del backlog).
+      Guard de rol: solo supervisores y administradores.
+      Valida tareas activas (backlog ítem 4) antes de desactivar.
     """
+    perfiles = await _obtener_perfiles(usuario_actual.id, db)
+    if not any(p in perfiles for p in ("supervisor", "dueno", "administrador")):
+        raise HTTPException(403, "Solo supervisores y administradores pueden eliminar servicios")
+
+    # Verificar que no haya tareas activas asignadas a este servicio
+    tareas_activas = await db.execute(text("""
+        SELECT COUNT(*) AS cnt FROM tareas
+        WHERE servicio_id = :id AND activa = TRUE
+          AND estado NOT IN ('completada', 'cancelada')
+    """), {"id": servicio_id})
+    cnt = tareas_activas.fetchone().cnt
+    if cnt > 0:
+        raise HTTPException(400,
+            f"No se puede desactivar: el servicio tiene {cnt} tarea(s) activa(s) asignada(s). "
+            "Completá o cancelá esas tareas primero.")
+
     # Marcar el servicio como inactivo sin borrar el registro
     await db.execute(text(
         "UPDATE servicios SET activo = FALSE WHERE id = :id"

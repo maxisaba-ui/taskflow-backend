@@ -354,6 +354,9 @@ async def crear_feriado(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
+    perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
+    if not any(p in perfiles for p in ["administrador", "dueno", "supervisor"]):
+        raise HTTPException(403, "Solo supervisores y administradores pueden crear feriados")
     try:
         result = await db.execute(text("""
             INSERT INTO feriados (fecha, nombre, tipo, anio, activo, creado_en, creado_por)
@@ -382,6 +385,9 @@ async def duplicar_anio_feriados(
       Ajusta fechas (mismo dia/mes, año distinto). Maneja 29/Feb.
       No pisa feriados ya existentes en el año destino.
     """
+    perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
+    if not any(p in perfiles for p in ["administrador", "dueno", "supervisor"]):
+        raise HTTPException(403, "Solo supervisores y administradores pueden duplicar feriados")
     if datos.anio_origen == datos.anio_destino:
         raise HTTPException(400, "El año origen y el destino deben ser diferentes")
 
@@ -427,6 +433,9 @@ async def editar_feriado(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
+    perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
+    if not any(p in perfiles for p in ["administrador", "dueno", "supervisor"]):
+        raise HTTPException(403, "Solo supervisores y administradores pueden editar feriados")
     existe = await db.execute(text(
         "SELECT id FROM feriados WHERE id = :id AND activo = TRUE"
     ), {"id": feriado_id})
@@ -454,6 +463,9 @@ async def eliminar_feriado(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
+    perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
+    if not any(p in perfiles for p in ["administrador", "dueno", "supervisor"]):
+        raise HTTPException(403, "Solo supervisores y administradores pueden eliminar feriados")
     await db.execute(text(
         "UPDATE feriados SET activo = FALSE WHERE id = :id"
     ), {"id": feriado_id})
@@ -520,6 +532,9 @@ async def crear_tarea_catalogo(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
+    perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
+    if not any(p in perfiles for p in ["administrador", "dueno", "supervisor"]):
+        raise HTTPException(403, "Solo supervisores y administradores pueden crear tareas en el catálogo")
     dup = await db.execute(text(
         "SELECT id FROM catalogo_tareas WHERE codigo = :c AND activo = TRUE"
     ), {"c": datos.codigo.upper()})
@@ -565,6 +580,9 @@ async def editar_tarea_catalogo(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
+    perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
+    if not any(p in perfiles for p in ["administrador", "dueno", "supervisor"]):
+        raise HTTPException(403, "Solo supervisores y administradores pueden editar el catálogo")
     existe = await db.execute(text(
         "SELECT id FROM catalogo_tareas WHERE id = :id AND activo = TRUE"
     ), {"id": tarea_id})
@@ -617,6 +635,9 @@ async def desactivar_tarea_catalogo(
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     db: AsyncSession = Depends(get_db)
 ):
+    perfiles = await _obtener_perfiles_param(usuario_actual.id, db)
+    if not any(p in perfiles for p in ["administrador", "dueno"]):
+        raise HTTPException(403, "Solo administradores pueden eliminar tareas del catálogo")
     await db.execute(text(
         "UPDATE catalogo_tareas SET activo = FALSE WHERE id = :id"
     ), {"id": tarea_id})

@@ -322,8 +322,9 @@ export default function GestionFeriados() {
 
       {/* Tabla de feriados */}
       <div style={{ background:"#111827", borderRadius:"10px",
-        border:"1px solid #1f2937", overflow:"hidden" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px" }}>
+        border:"1px solid #1f2937", overflow:"hidden",
+        overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px", minWidth:"480px" }}>
           <thead>
             <tr style={{ background:"#1f2937", color:"#9ca3af" }}>
               <th style={{ textAlign:"left", padding:"11px 16px", fontWeight:"600", width:"130px" }}>Fecha</th>

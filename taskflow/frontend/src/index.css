@@ -97,3 +97,53 @@ body {
   @apply inline-flex items-center gap-1.5 text-xs font-medium
          px-2.5 py-1 rounded-full;
 }
+
+/* ============================================================
+   RESPONSIVE — mobile-first overrides
+   Breakpoint: < 768px = mobile
+   Estrategia: desktop styles no se tocan, solo se agregan
+   overrides para pantallas chicas.
+   ============================================================ */
+
+/* Viewport meta — asegura escala correcta en móvil */
+@media (max-width: 767px) {
+  /* Evitar overflow horizontal global */
+  body { overflow-x: hidden; }
+
+  /* Tablas scrolleables horizontalmente en móvil */
+  .tf-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Grids de stats: 2 columnas en mobile */
+  .tf-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Grids de filtros: 1 columna en mobile */
+  .tf-filter-grid { grid-template-columns: 1fr !important; }
+
+  /* Ocultar columnas opcionales en mobile */
+  .tf-hide-mobile { display: none !important; }
+
+  /* Texto más chico en badges de tablas */
+  .tf-badge-sm { font-size: 10px !important; padding: 1px 5px !important; }
+
+  /* Botones de acción más accesibles al toque */
+  button { min-height: 36px; }
+
+  /* Formularios full-width en mobile */
+  .tf-form-row { flex-direction: column !important; gap: 8px !important; }
+  .tf-form-row > * { width: 100% !important; }
+
+  /* Paneles de filtros padding reducido */
+  .tf-filter-panel { padding: 10px !important; }
+
+  /* Headers de página más compactos */
+  .tf-page-header { font-size: 18px !important; }
+
+  /* Cards de resumen: texto más pequeño */
+  .tf-stat-value { font-size: 18px !important; }
+}
+
+@media (max-width: 480px) {
+  /* Móvil muy pequeño */
+  .tf-stats-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  .tf-stat-value { font-size: 16px !important; }
+}

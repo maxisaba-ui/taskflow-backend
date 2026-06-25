@@ -624,8 +624,9 @@ export default function GestionCatalogo() {
                 color:"#6b7280", border:"1px solid #374151" }}>{lista.length}</span>
             </div>
             <div style={{ background:"#111827", borderRadius:"8px",
-              border:"1px solid #1f2937", overflow:"hidden" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px" }}>
+              border:"1px solid #1f2937", overflow:"hidden",
+              overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px", minWidth:"560px" }}>
                 <thead>
                   <tr style={{ background:"#1a2235", color:"#9ca3af" }}>
                     <th style={{ textAlign:"left", padding:"9px 14px", fontWeight:"600", width:"90px" }}>Código</th>

@@ -14,6 +14,7 @@ import { hoyLocal } from "../utils/dateHelpers.js";
 import { useState, useEffect, useContext, useRef } from "react";
 import { AuthContext } from "../context/AuthContext.jsx";
 import { api } from "../api/client.js";
+import { useResponsive } from "../hooks/useResponsive.js";
 import TarjetaTarea    from "../components/tareas/TarjetaTarea.jsx";
 import ResumenDia      from "../components/dashboard/ResumenDia.jsx";
 import PanelSupervisor from "../components/dashboard/PanelSupervisor.jsx";
@@ -392,6 +393,7 @@ function MiJornada({ fecha, usuario, esSupervisor, esAdmin }) {
 export default function Dashboard() {
   const { usuario } = useContext(AuthContext);
   const hoyISO = hoyLocal();
+  const { isMobile } = useResponsive();
 
   const [tab, setTab]                   = useState("tareas");  // "tareas" | "jornada"
   const [fecha, setFecha]               = useState(hoyISO);
@@ -596,9 +598,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Layout: tareas + panel lateral */}
+        {/* Layout: tareas + panel lateral — 1 columna en mobile */}
         <div style={{ display:"grid",
-          gridTemplateColumns: esSupervisor ? "1fr 280px" : "1fr",
+          gridTemplateColumns: (esSupervisor && !isMobile) ? "1fr 280px" : "1fr",
           gap:"20px", alignItems:"start" }}>
 
           <div>

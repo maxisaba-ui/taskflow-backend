@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source taskflow/backend/venv/bin/activate && pytest tests/ *)",
+      "Bash(source taskflow/backend/venv/bin/activate && python -c \"from app.api.*)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s http://localhost:8000/docs)"
+    ]
+  }
+}

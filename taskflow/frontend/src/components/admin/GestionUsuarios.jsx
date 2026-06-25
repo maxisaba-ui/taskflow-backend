@@ -221,8 +221,9 @@ function PanelSupervisores({ usuarios }) {
         </div>
       ) : (
         <div style={{ background:"#111827", borderRadius:"8px",
-          border:"1px solid #1f2937", overflow:"hidden" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px" }}>
+          border:"1px solid #1f2937", overflow:"hidden",
+          overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px", minWidth:"520px" }}>
             <thead>
               <tr style={{ background:"#1f2937" }}>
                 <th style={{ textAlign:"left", padding:"10px 14px", color:"#9ca3af", fontWeight:"600" }}>Supervisor</th>
@@ -469,8 +470,9 @@ export default function GestionUsuarios() {
       {cargando ? (
         <div style={{ textAlign:"center", padding:"40px", color:"#6b7280" }}>⏳ Cargando...</div>
       ) : (
-        <div style={{ background:"#111827", borderRadius:"10px", border:"1px solid #1f2937", overflow:"hidden" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px" }}>
+        <div style={{ background:"#111827", borderRadius:"10px", border:"1px solid #1f2937",
+          overflow:"hidden", overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px", minWidth:"480px" }}>
             <thead>
               <tr style={{ background:"#1f2937", color:"#9ca3af" }}>
                 <th style={{ textAlign:"left", padding:"12px 16px", fontWeight:"600" }}>Usuario</th>
